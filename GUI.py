@@ -1,6 +1,7 @@
 import tkinter as tk
 from Analisis_Lexico import SEPARADOR, imprimir_tokens, Automata
 from Analisis_Sintactico import construir_arbol, imprimir_arbol
+from Analisis_Semantico import AnalizadorSemantico
 from tkinter import scrolledtext, PanedWindow, filedialog, messagebox
 import sys
 import io
@@ -62,7 +63,7 @@ class App(tk.Tk):
         compiler_menu.add_separator()
         compiler_menu.add_command(label="🔬 Análisis Léxico", command=self.Analisis_Lexico)
         compiler_menu.add_command(label="🔍 Análisis Sintáctico", command=self.Analisis_Sintactico)
-        compiler_menu.add_command(label="📊 Análisis Semántico", command=self.placeholder_command)
+        compiler_menu.add_command(label="📊 Análisis Semántico", command=self.Analisis_Semantico)
 
         # --- Menú Ayuda ---
         help_menu = tk.Menu(menubar, tearoff=0)
@@ -262,7 +263,29 @@ class App(tk.Tk):
             sys.stdout = old_stdout
 
         self.write_to_console(output)
+        
+    # --- MÉTODO DE ANÁLISIS SEMÁNTICO ---
+    def Analisis_Semantico(self, event=None):
+        source_code = self.editor.get("1.0", tk.END)
+        if not source_code.strip():
+            self.write_to_console("No hay código para analizar.")
+            return
 
+        old_stdout = sys.stdout
+        redirected_output = sys.stdout = io.StringIO()
+
+        output = ""
+        try:
+            tokens = SEPARADOR(source_code)
+            automata = Automata()
+            analizador = AnalizadorSemantico(tokens)
+            output = analizador.analizar(automata)
+        except Exception as e:
+            output += f"Error durante el análisis semántico: {e}"
+        finally:
+            sys.stdout = old_stdout
+
+        self.write_to_console(output)
 
     # --- Funciones de Menús ---
     def compiler_selected(self):

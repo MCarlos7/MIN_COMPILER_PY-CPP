@@ -1,37 +1,39 @@
 class Automata:
     def __init__(self):
         self.estado = 'inicio'
+        # Conjunto de caracteres no permitidos en identificadores
         self.ESPECIALES = {'$', '#', '/', ',', '(', '.', '@', ';', '=', '+', '-', '*', ' '}
-        # Se puede añadir cualquier otro carácter que no sea parte de un identificador.
 
     def transicion(self, caracter):
         if self.estado == 'inicio':
-            # El primer caracter debe ser una letra o un guion bajo.
+            # El primer caracter debe ser letra o guion bajo
             if caracter.isalpha() or caracter == '_':
                 self.estado = 'valido'
             else:
                 self.estado = 'invalido'
         elif self.estado == 'valido':
-            # Los caracteres siguientes pueden ser letras, números o guiones bajos.
+            # Los siguientes caracteres pueden ser letras, números o guiones bajos
             if not (caracter.isalnum() or caracter == '_'):
                 self.estado = 'invalido'
 
     def es_valido(self, cadena):
-        # Reinicia el estado para cada nueva validación.
+        """
+        Verifica si una cadena es un identificador válido según el autómata.
+        """
         self.estado = 'inicio'
+        if not cadena:
+            return False
         for caracter in cadena:
             self.transicion(caracter)
             if self.estado == 'invalido':
                 return False
-        # Si la cadena está vacía, no es un identificador válido.
-        if not cadena:
-            return False
         return self.estado == 'valido'
 
-# Esta función es el "tokenizador" principal.
+
+# --- TOKENIZADOR ---
 def SEPARADOR(codigo_fuente):
     """
-    Toma una cadena de código y la divide en una lista de tokens.
+    Divide una cadena de código en una lista de tokens.
     """
     tokens_especiales = {
         '{': "LLAVEAPER", '}': "LLAVECIERRE",
@@ -41,18 +43,21 @@ def SEPARADOR(codigo_fuente):
         '*': "OPMUL", '/': "OPDIV",
         '=': "ASIGN"
     }
+
     salida = []
-    buffer = [] # Almacena caracteres para formar un token.
+    buffer = []  # Acumula caracteres para formar un token
+    automata = Automata()
 
     def guardar_buffer():
         nonlocal buffer
         if buffer:
             token_str = "".join(buffer)
-            # Determina si el token es un número o un identificador.
             if token_str.isdigit():
                 salida.append({"token": "TKN NUM", "valor": token_str})
-            else:
+            elif automata.es_valido(token_str):
                 salida.append({"token": "TKN ID", "valor": token_str})
+            else:
+                salida.append({"token": "INVALIDO", "valor": token_str})
             buffer = []
 
     for caracter in codigo_fuente:
@@ -60,24 +65,25 @@ def SEPARADOR(codigo_fuente):
             guardar_buffer()
             salida.append({"token": f"TKN {tokens_especiales[caracter]}", "valor": caracter})
         elif caracter.isspace():
-            guardar_buffer() # Los espacios actúan como separadores.
+            guardar_buffer()
         else:
             buffer.append(caracter)
 
-    # Guarda cualquier token restante en el buffer al final del archivo.
     guardar_buffer()
     return salida
 
-# Función para imprimir los tokens de forma legible.
+
+# --- IMPRESIÓN DE TOKENS ---
 def imprimir_tokens(tokens, automata):
     """
     Imprime la lista de tokens y valida los identificadores.
     """
     print("\n=== TOKENS ===\n")
     for i, t in enumerate(tokens, start=1):
-        if t['token'] == "TKN ID":
-            # Usa el autómata para validar la estructura del identificador.
-            valido_str = "" if automata.es_valido(t['valor']) else "<- TOKEN NO VÁLIDO"
+        if t["token"] == "TKN ID":
+            valido_str = "" if automata.es_valido(t["valor"]) else "<- TOKEN NO VÁLIDO"
             print(f"{i}. <{t['token']}, {t['valor']}> {valido_str}")
+        elif t["token"] == "INVALIDO":
+            print(f"{i}. <{t['token']}, {t['valor']}> <- ERROR LÉXICO")
         else:
             print(f"{i}. <{t['token']}, {t['valor']}>")
