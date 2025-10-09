@@ -15,11 +15,13 @@ class App(tk.Tk):
 
         self.BG_COLOR = "#1E1E1E"  # Gris oscuro para el fondo
         self.FG_COLOR = "#D4D4D4"  # Gris claro para el texto
+        self.LINE_NUM_BG = "#2A2A2A" # Fondo para los números de línea
 
         # --- Creación de los componentes de la GUI ---
         self.create_menubar()
         self.create_widgets()
         self.create_key_bindings()
+        self._update_line_numbers() # Dibuja los números de línea iniciales
 
     def create_menubar(self):
         menubar = tk.Menu(self)
@@ -97,23 +99,51 @@ class App(tk.Tk):
         types_menu.add_command(label="bool", compound='left', command=self.placeholder_command)
         types_menu.add_command(label="list", compound='left', command=self.placeholder_command)
 
-
     def create_widgets(self):
-        """Crea las áreas de texto y el panel divisor."""
+        """Crea las áreas de texto, el panel divisor y el contador de líneas."""
         paned_window = PanedWindow(self, orient=tk.VERTICAL, sashrelief=tk.RAISED, bg=self.BG_COLOR)
         paned_window.pack(fill=tk.BOTH, expand=True)
 
-        # --- Editor de Código (panel superior) ---
-        self.editor = scrolledtext.ScrolledText(
-            paned_window,
+        # --- Editor de Código y Contador de Líneas (panel superior) ---
+        # Usamos un Frame para agrupar el contador y el editor
+        editor_frame = tk.Frame(paned_window, bg=self.BG_COLOR)
+        
+        # Widget para los números de línea
+        self.line_numbers = tk.Text(
+            editor_frame,
+            width=4,
+            padx=4,
+            font=("Consolas", 12),
+            bg=self.LINE_NUM_BG,
+            fg=self.FG_COLOR,
+            state="disabled", # Para que el usuario no pueda escribir en él
+            bd=0, # Sin borde
+            highlightthickness=0 # Sin borde de resaltado
+        )
+        self.line_numbers.pack(side=tk.LEFT, fill=tk.Y)
+
+        # Widget para el editor de código (usamos tk.Text en lugar de scrolledtext)
+        self.editor = tk.Text(
+            editor_frame,
             wrap=tk.WORD,
             font=("Consolas", 12),
             bg=self.BG_COLOR,
             fg=self.FG_COLOR,
-            insertbackground="white", # Color del cursor
-            undo=True # Habilitar la función de deshacer/rehacer
+            insertbackground="white",
+            undo=True,
+            bd=0,
+            highlightthickness=0
         )
-        paned_window.add(self.editor, height=500)
+        self.editor.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # Scrollbar que controlará AMBOS widgets (editor y números de línea)
+        scrollbar = tk.Scrollbar(editor_frame, command=self._on_scroll)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Vincular la scrollbar al editor
+        self.editor.config(yscrollcommand=scrollbar.set)
+        
+        paned_window.add(editor_frame, height=500)
 
         # --- Consola de Salida (panel inferior) ---
         self.console = scrolledtext.ScrolledText(
@@ -126,6 +156,33 @@ class App(tk.Tk):
         )
         paned_window.add(self.console)
 
+    def _on_scroll(self, *args):
+        """Sincroniza el desplazamiento vertical del editor y el contador de líneas."""
+        self.editor.yview(*args)
+        self.line_numbers.yview(*args)
+    
+    def _update_line_numbers(self, event=None):
+            """Actualiza los números en el widget de contador de líneas."""
+            # Un pequeño retraso para asegurar que el widget del editor se actualice primero
+            self.after(1, self._update_line_numbers_logic)
+
+    def _update_line_numbers_logic(self):
+        """Lógica real para actualizar los números de línea."""
+        line_count = self.editor.index(tk.END).split('.')[0]
+        
+        # Creamos el texto de los números de línea (1\n2\n3\n...)
+        # El rango ahora va hasta line_count para incluir la última línea si está vacía
+        line_numbers_text = "\n".join(str(i) for i in range(1, int(line_count)))
+        
+        # Habilitamos, actualizamos y deshabilitamos el widget
+        self.line_numbers.config(state="normal")
+        self.line_numbers.delete("1.0", tk.END)
+        self.line_numbers.insert("1.0", line_numbers_text)
+        self.line_numbers.config(state="disabled")
+
+        # Aseguramos que la vista esté sincronizada
+        self.line_numbers.yview_moveto(self.editor.yview()[0])
+
     def create_key_bindings(self):
         """Asocia los atajos de teclado a las funciones."""
         self.bind("<Control-o>", self.open_file)
@@ -133,13 +190,19 @@ class App(tk.Tk):
         self.bind("<Control-l>", self.clear_screen)
         self.bind("<Control-q>", self.close_app)
         self.bind("<F5>", self.run_code)
-        #self.bind("<Control-a>", self.select_all)
-        #self.bind("<Control-x>", self.cut_text)
-        #self.bind("<Control-c>", self.copy_text)
-        #self.bind("<Control-v>", self.paste_text)
+        
+        # Cada vez que se suelta una tecla o se hace clic, se actualiza el contador
+        self.editor.bind("<KeyRelease>", self._update_line_numbers)
+        self.editor.bind("<Button-1>", self._update_line_numbers)
+        
+        # Eventos para deshacer y rehacer también deben actualizar el contador
+        self.editor.bind("<<Undo>>", self._update_line_numbers)
+        self.editor.bind("<<Redo>>", self._update_line_numbers)
+        self.editor.bind("<<Paste>>", self._update_line_numbers)
+
         self.bind("<Control-z>", self.undo)
         self.bind("<Control-y>", self.redo)
-
+    
     # --- Funciones de Archivo ---
     def open_file(self, event=None):
         filepath = filedialog.askopenfilename(filetypes=[("Python Files", "*.py"), ("All Files", "*.*")])
@@ -149,6 +212,7 @@ class App(tk.Tk):
         with open(filepath, "r", encoding="utf-8") as f:
             self.editor.insert("1.0", f.read())
         self.title(f"PYTHON IDE - {filepath}")
+        self._update_line_numbers() # Actualiza los números al abrir archivo
 
     def save_file(self, event=None):
         filepath = filedialog.asksaveasfilename(defaultextension=".py", filetypes=[("Python Files", "*.py"), ("All Files", "*.*")])
@@ -160,7 +224,8 @@ class App(tk.Tk):
 
     def clear_screen(self, event=None):
         self.editor.delete("1.0", tk.END)
-        self.write_to_console("") # Limpia la consola
+        self.write_to_console("") 
+        self._update_line_numbers() # Actualiza los números al limpiar
 
     def close_app(self, event=None):
         self.destroy()
@@ -168,6 +233,7 @@ class App(tk.Tk):
     # --- Funciones de Edición ---
     def cut_text(self, event=None):
         self.editor.event_generate("<<Cut>>")
+        self._update_line_numbers()
         return "break"
     
     def copy_text(self, event=None):
@@ -176,18 +242,19 @@ class App(tk.Tk):
 
     def paste_text(self, event=None):
         self.editor.event_generate("<<Paste>>")
+        self._update_line_numbers()
         return "break"
 
     def select_all(self, event=None):
         self.editor.tag_add("sel", "1.0", "end")
-        return "break" # Evita que se propague el evento
+        return "break"
 
     def undo(self, event=None):
-        self.editor.edit_undo()
+        self.editor.event_generate("<<Undo>>")
         return "break"
 
     def redo(self, event=None):
-        self.editor.edit_redo()
+        self.editor.event_generate("<<Redo>>")
         return "break"
 
     # --- Funciones de Ejecución ---
@@ -221,9 +288,7 @@ class App(tk.Tk):
 
         output = "--- ANÁLISIS LÉXICO ---\n"
         try:
-            # 1. Obtiene los tokens usando la función importada.
             tokens = SEPARADOR(source_code)
-            # 2. Imprime los tokens (la salida se captura).
             automata = Automata()
             imprimir_tokens(tokens, automata)
             output += redirected_output.getvalue()
@@ -246,13 +311,10 @@ class App(tk.Tk):
 
         output = "--- ANÁLISIS SINTÁCTICO (ÁRBOL DE PARSEO) ---\n"
         try:
-            # 1. El análisis sintáctico siempre necesita primero el léxico.
             tokens = SEPARADOR(source_code)
-            # 2. Construye el árbol a partir de los tokens.
             arbol = construir_arbol(tokens)
 
             if arbol:
-                # 3. Imprime el árbol si se construyó correctamente.
                 imprimir_arbol(arbol)
                 output += redirected_output.getvalue()
             else:
@@ -289,7 +351,6 @@ class App(tk.Tk):
 
     # --- Funciones de Menús ---
     def compiler_selected(self):
-        """Función que se llama al seleccionar un compilador. )"""
         messagebox.showinfo("Compilador", f"Has seleccionado: {self.selected_compiler.get()}")
 
     def show_about(self):
@@ -297,3 +358,7 @@ class App(tk.Tk):
 
     def placeholder_command(self, event=None):
         messagebox.showwarning("No implementado", "Esta función aún no está disponible.")
+
+if __name__ == "__main__":
+    app = App()
+    app.mainloop()
