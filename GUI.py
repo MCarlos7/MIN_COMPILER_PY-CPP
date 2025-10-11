@@ -1,6 +1,6 @@
 import tkinter as tk
 from Analisis_Lexico import SEPARADOR, imprimir_tokens, Automata
-from Analisis_Sintactico import construir_arbol, imprimir_arbol
+from Analisis_Sintactico import Sintactico
 from Analisis_Semantico import AnalizadorSemantico
 from tkinter import scrolledtext, PanedWindow, filedialog, messagebox
 import sys
@@ -301,30 +301,38 @@ class App(tk.Tk):
 
     # --- MÉTODO DE ANÁLISIS SINTÁCTICO ---
     def Analisis_Sintactico(self, event=None):
-        source_code = self.editor.get("1.0", tk.END)
-        if not source_code.strip():
-            self.write_to_console("No hay código para analizar.")
-            return
+            """
+            Toma el código del editor, lo analiza con el nuevo compilador
+            y muestra la salida en la consola de la GUI.
+            """
+            source_code = self.editor.get("1.0", tk.END)
+            if not source_code.strip():
+                self.write_to_console("No hay código para analizar.")
+                return
 
-        old_stdout = sys.stdout
-        redirected_output = sys.stdout = io.StringIO()
+            # 1. Preparar la redirección para capturar los 'print' del compilador
+            old_stdout = sys.stdout
+            redirected_output = io.StringIO()
+            sys.stdout = redirected_output
 
-        output = "--- ANÁLISIS SINTÁCTICO (ÁRBOL DE PARSEO) ---\n"
-        try:
-            tokens = SEPARADOR(source_code)
-            arbol = construir_arbol(tokens)
+            try:
+                # 2. Llamar a la clase principal del compilador
+                # La traza en True genera el resultado detallado que quieres
+                Sintactico(fuente=source_code, traza=True)
 
-            if arbol:
-                imprimir_arbol(arbol)
-                output += redirected_output.getvalue()
-            else:
-                output += "No se pudo construir el árbol. Verifique la expresión."
-        except Exception as e:
-            output += f"Error durante el análisis sintáctico: {e}"
-        finally:
-            sys.stdout = old_stdout
+            except Exception as e:
+                # El error ya fue impreso en 'redirected_output' por el método 'errores'.
+                # La excepción detiene el análisis y nos permite continuar aquí.
+                # No es necesario hacer nada más con la excepción 'e'.
+                pass
 
-        self.write_to_console(output)
+            finally:
+                # 3. Restaurar la salida estándar original
+                sys.stdout = old_stdout
+
+            # 4. Obtener todo lo que se imprimió y mostrarlo en la consola
+            output_final = redirected_output.getvalue()
+            self.write_to_console(output_final)
         
     # --- MÉTODO DE ANÁLISIS SEMÁNTICO ---
     def Analisis_Semantico(self, event=None):
