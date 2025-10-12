@@ -13,83 +13,105 @@ class Automata:
                 self.estado = 'invalido'
 
     def es_valido(self, cadena):
-        """
-        Verifica si una cadena es un identificador válido según el autómata.
-        """
         self.estado = 'inicio'
-        if not cadena:
-            return False
+        if not cadena: return False
         for caracter in cadena:
             self.transicion(caracter)
-            if self.estado == 'invalido':
-                return False
+            if self.estado == 'invalido': return False
         return self.estado == 'valido'
 
-# La clase principal que será usada por Analisis_Sintactico.py
 class Lexico:
+    """
+    Analizador Léxico adaptado para sintaxis tipo C++.
+    Reconoce palabras clave y operadores multi-carácter.
+    """
     def __init__(self, fuente, traza=False):
-        self.fuente = fuente
+        self.fuente = fuente + ' '
         self.traza = traza
         self.tokens = []
         self.numeros_de_linea = []
         self.idx_token_actual = -1
         self.token_actual = ''
-
-        # Iniciar el proceso de tokenización
         self._tokenizar()
 
     def _tokenizar(self):
-        # Símbolos que actúan como separadores y son tokens por sí mismos.
-        simbolos = ['{', '}', '(', ')', ';', '=', '+', '-', '*', '/', '%']
-        buffer = []
+        PALABRAS_CLAVE = [
+            'int', 'main', 'if', 'else', 'switch', 'case', 'default', 'break',
+            'cin', 'cout', 'return'
+        ]
+        
+        simbolos_simples = ['{', '}', '(', ')', ';', ',', ':']
+        
+        buffer = ''
         numero_linea_actual = 1
+        i = 0
+        
+        while i < len(self.fuente):
+            caracter = self.fuente[i]
 
-        def guardar_buffer():
-            nonlocal buffer
-            if buffer:
-                token_str = "".join(buffer)
-                self.tokens.append(token_str)
+            if caracter.isalpha() or caracter == '_':
+                buffer += caracter
+            elif caracter.isdigit():
+                buffer += caracter
+            elif caracter in "<>=!": # Posibles operadores de dos caracteres
+                if buffer: self._guardar_buffer(buffer, numero_linea_actual, PALABRAS_CLAVE); buffer = ''
+                
+                op = caracter
+                if i + 1 < len(self.fuente) and self.fuente[i+1] == '=':
+                    op += '='
+                    i += 1
+                elif caracter in "<>" and i + 1 < len(self.fuente) and self.fuente[i+1] == caracter:
+                    op += caracter
+                    i += 1
+                
+                self.tokens.append(op)
                 self.numeros_de_linea.append(numero_linea_actual)
-                buffer = []
-
-        # Recorremos el código fuente caracter por caracter
-        for caracter in self.fuente:
-            if caracter in simbolos:
-                guardar_buffer()  # Guarda lo que hubiera en el buffer
-                self.tokens.append(caracter) # Guarda el símbolo
+            elif caracter in "+-*/%": # Operadores de un caracter
+                if buffer: self._guardar_buffer(buffer, numero_linea_actual, PALABRAS_CLAVE); buffer = ''
+                self.tokens.append(caracter)
+                self.numeros_de_linea.append(numero_linea_actual)
+            elif caracter in simbolos_simples:
+                if buffer: self._guardar_buffer(buffer, numero_linea_actual, PALABRAS_CLAVE); buffer = ''
+                self.tokens.append(caracter)
                 self.numeros_de_linea.append(numero_linea_actual)
             elif caracter.isspace():
-                guardar_buffer() # Un espacio separa tokens
+                if buffer: self._guardar_buffer(buffer, numero_linea_actual, PALABRAS_CLAVE); buffer = ''
                 if caracter == '\n':
                     numero_linea_actual += 1
-            else:
-                # Si no es un símbolo ni un espacio, es parte de un token más grande
-                buffer.append(caracter)
+            
+            i += 1
 
-        guardar_buffer() # Guardar cualquier resto en el buffer al final del archivo
+    def _guardar_buffer(self, buffer, linea, palabras_clave):
+        # Si el buffer contiene solo dígitos, es un número, si no, es un identificador o palabra clave.
+        if buffer:
+            if buffer in palabras_clave:
+                self.tokens.append(buffer)
+            elif buffer.isdigit():
+                self.tokens.append(buffer) # Se podría etiquetar como 'NUMERO' si se quisiera
+            else:
+                # Validar con el autómata si es un identificador válido
+                if Automata().es_valido(buffer):
+                    self.tokens.append(buffer) # Se podría etiquetar como 'ID'
+                else:
+                    self.tokens.append(f"INVALIDO({buffer})") # Token inválido
+            self.numeros_de_linea.append(linea)
 
     def siguienteToken(self):
-        """Devuelve el siguiente token de la lista."""
         if self.idx_token_actual < len(self.tokens) - 1:
             self.idx_token_actual += 1
             self.token_actual = self.tokens[self.idx_token_actual]
             return self.token_actual
         else:
-            self.token_actual = 'EOF' # Fin del archivo
+            self.token_actual = 'EOF'
             return 'EOF'
 
     def devuelveToken(self):
-        """Retrocede al token anterior en la lista."""
         if self.idx_token_actual > 0:
             self.idx_token_actual -= 1
             self.token_actual = self.tokens[self.idx_token_actual]
 
-    def existeTraza(self):
-        """Verifica si la traza de tokens está activa."""
-        return self.traza
-
     def lineaActual(self):
-        """Devuelve el número de línea REAL del token actual."""
         if 0 <= self.idx_token_actual < len(self.numeros_de_linea):
             return self.numeros_de_linea[self.idx_token_actual]
         return self.numeros_de_linea[-1] if self.numeros_de_linea else 1
+    
