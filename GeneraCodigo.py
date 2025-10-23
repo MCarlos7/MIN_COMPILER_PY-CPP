@@ -1,8 +1,5 @@
 class GeneraCodigo:
-    """
-    Simula la generación del código objeto con mensajes descriptivos.
-    Ahora incluye manejo de etiquetas y saltos para control de flujo.
-    """
+
     def __init__(self):
         self.label_count = 0
 
@@ -12,9 +9,14 @@ class GeneraCodigo:
         return f"L{self.label_count}"
 
     def code(self): print("Generando código para main")
-    def end(self): pass
+    def end(self): print("Fin del programa") 
     def pusha(self, token): print(f"Push variable: {token}")
-    def pushc(self, token): print(f"Push constante: {token}")
+    def pushc(self, token): 
+        print(f"Push constante: {token}")
+    def push_string(self, string_literal):
+        print(f"Push string: {string_literal}")
+    def push_char(self, char_literal):
+        print(f"Push char: {char_literal}")
     def store(self): print("Almacenando valor")
     def load(self): print("Cargando valor de variable")
     def add(self): print("Sumando")
@@ -23,8 +25,9 @@ class GeneraCodigo:
     def div(self): print("Dividiendo")
     def mod(self): print("Calculando módulo")
     def input(self, token): print(f"Leyendo entrada para: {token}")
-    def output(self, token): print(f"Escribiendo salida de: {token}")
-
+    def output(self, token): print(f"Escribiendo salida de: {token}") 
+    def out(self):
+        print("Escribiendo valor de la pila en la salida")
     def cmp_equal(self): print("Comparando por igualdad (==)")
     def cmp_notequal(self): print("Comparando por desigualdad (!=)")
     def cmp_less(self): print("Comparando por menor que (<)")

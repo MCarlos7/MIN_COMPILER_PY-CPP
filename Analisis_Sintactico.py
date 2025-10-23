@@ -34,6 +34,9 @@ class Sintactico:
             12: ": SE ESPERABA ':'",
             13: ": SE ESPERABA '<<' o '>>'",
             14: ": SE ESPERABA '='",
+            15: ": SE ESPERABA UNA CONSTANTE NUMERICA",
+            16: ": SE ESPERABA UN CARACTER LITERAL (ej: 'A')",
+            17: ": SE ESPERABA UNA CONSTANTE (NUMERO o CHAR) PARA EL CASE"
         }
         mensaje = f"LINEA {self.lexico.lineaActual()} ERROR SINTACTICO {codigo_error}{errores_msg.get(codigo_error, ': ERROR DESCONOCIDO')}"
         print(mensaje)
@@ -50,9 +53,14 @@ class Sintactico:
             elif token_esperado == '{': self.errores(5)
             elif token_esperado == '}': self.errores(6)
             elif token_esperado == ';': self.errores(7)
+            elif token_esperado in ['case', 'default']: self.errores(11)
             elif token_esperado == ':': self.errores(12)
+            elif token_esperado in ['<<', '>>']: self.errores(13)
             elif token_esperado == '=': self.errores(14)
-            else: self.errores(0)
+            else:
+                mensaje = f"LINEA {self.lexico.lineaActual()} ERROR SINTACTICO: Se esperaba '{token_esperado}' pero se encontró '{self.token}'"
+                print(mensaje)
+                raise SyntaxError(mensaje)
 
     def programa(self):
         if self.traza: print("ANALISIS SINTACTICO: <PROGRAMA>")
@@ -66,7 +74,7 @@ class Sintactico:
         self.bloque()
         if self.token == 'return':
             self.parea('return')
-            self.constante()
+            self.expresion()
             self.parea(';')
         self.parea('}')
         self.generaCodigo.end()
@@ -86,9 +94,8 @@ class Sintactico:
             self.sentencia_cin()
         elif self.token == 'cout':
             self.sentencia_cout()
-        elif self.token == 'int':
+        elif self.token == 'int' or self.token == 'char':
             self.declaracion()
-        # --- CAMBIO 1: AÑADIR RECONOCIMIENTO DE 'break' ---
         elif self.token == 'break':
             self.sentencia_break()
         elif self.automata.es_valido(self.token):
@@ -104,14 +111,42 @@ class Sintactico:
 
     def declaracion(self):
         if self.traza: print("ANALISIS SINTACTICO: <DECLARACION>")
-        self.parea('int')
+
+        tipo_token = self.token 
+        if tipo_token == 'int':
+            self.parea('int')
+        elif tipo_token == 'char':
+            self.parea('char')
+
         self.variable()
-        # Permitir inicialización opcional
+
         if self.token == '=':
             self.parea('=')
-            self.expresion()
+            if tipo_token == 'int':
+                self.expresion() 
+            elif tipo_token == 'char':
+                self.valor_char()
             self.generaCodigo.store()
         self.parea(';')
+    
+    def valor_char(self):
+        if self.traza: 
+            print("ANALISIS SINTACTICO: <VALOR_CHAR>")
+        if len(self.token) == 3 and self.token.startswith("'") and self.token.endswith("'"):
+            self.generaCodigo.push_char(self.token) 
+            self.token = self.lexico.siguienteToken()
+        else:
+            self.errores(16)
+    
+    def constante_o_char(self):
+        if self.traza: print("ANALISIS SINTACTICO: <CONSTANTE_O_CHAR>")
+        
+        if self.token.isdigit():
+            self.constante()
+        elif len(self.token) == 3 and self.token.startswith("'") and self.token.endswith("'"):
+            self.valor_char()
+        else:
+            self.errores(17) 
     
     def asignacion(self):
         if self.traza: print("ANALISIS SINTACTICO: <ASIGNACION>")
@@ -172,28 +207,38 @@ class Sintactico:
             self.caso_default()
         self.parea('}')
         self.generaCodigo.switch_end()
-
-    # --- CAMBIO 3: SIMPLIFICAR EL MÉTODO 'caso' ---
+        
+    def bloque_case(self):
+        if self.traza: print("ANALISIS SINTACTICO: <BLOQUE_CASE>")
+        
+        while (self.token != 'break' and 
+               self.token != 'case' and 
+               self.token != 'default' and 
+               self.token != '}'):
+            
+            if self.token == 'EOF':
+                self.errores(6) 
+                break
+                
+            self.sentencia()
+        
+        if self.token == 'break':
+            self.sentencia_break()
+    
     def caso(self):
         if self.traza: print("ANALISIS SINTACTICO: <CASO>")
         self.parea('case')
-        # Capturamos el valor del case antes de consumirlo para el mensaje de GeneraCodigo
-        valor_case = self.token
-        self.constante()
+        valor_case = self.token 
+        self.constante_o_char() 
         self.parea(':')
         self.generaCodigo.case_begin(valor_case)
-        self.parea('{')
-        self.bloque() # El bloque se encarga de todo, incluyendo el 'break'
-        self.parea('}')
+        self.bloque_case() 
 
-    # --- CAMBIO 4: SIMPLIFICAR EL MÉTODO 'caso_default' ---
     def caso_default(self):
         if self.traza: print("ANALISIS SINTACTICO: <DEFAULT>")
         self.parea('default')
         self.parea(':')
-        self.parea('{')
-        self.bloque() # El bloque se encarga de todo, incluyendo el 'break'
-        self.parea('}')
+        self.bloque_case()
 
     def sentencia_cin(self):
         if self.traza: print("ANALISIS SINTACTICO: <CIN>")
@@ -205,8 +250,12 @@ class Sintactico:
     def sentencia_cout(self):
         if self.traza: print("ANALISIS SINTACTICO: <COUT>")
         self.parea('cout')
-        self.parea('<<')
-        self.expresion()
+        
+        while self.token == '<<':
+            self.parea('<<')
+            self.expresion()
+            self.generaCodigo.out()
+    
         self.parea(';')
 
     def variable(self):
@@ -249,7 +298,12 @@ class Sintactico:
 
     def factor(self):
         if self.traza: print("ANALISIS SINTACTICO: <FACTOR>")
-        if self.token == '(':
+        if self.token.startswith('"') and self.token.endswith('"'):
+            self.generaCodigo.push_string(self.token) 
+            self.token = self.lexico.siguienteToken()        
+        elif len(self.token) == 3 and self.token.startswith("'") and self.token.endswith("'"):
+            self.valor_char()
+        elif self.token == '(':
             self.parea('(')
             self.expresion()
             self.parea(')')
@@ -268,4 +322,4 @@ class Sintactico:
             self.generaCodigo.pushc(self.token)
             self.token = self.lexico.siguienteToken()
         else:
-            self.errores(6)
+            self.errores(15) # <-- CORREGIDO

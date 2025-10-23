@@ -21,10 +21,6 @@ class Automata:
         return self.estado == 'valido'
 
 class Lexico:
-    """
-    Analizador Léxico adaptado para sintaxis tipo C++.
-    Reconoce palabras clave y operadores multi-carácter.
-    """
     def __init__(self, fuente, traza=False):
         self.fuente = fuente + ' '
         self.traza = traza
@@ -37,7 +33,7 @@ class Lexico:
     def _tokenizar(self):
         PALABRAS_CLAVE = [
             'int', 'main', 'if', 'else', 'switch', 'case', 'default', 'break',
-            'cin', 'cout', 'return'
+            'cin', 'cout', 'return', 'while', 'for', 'char', 'float', 'double',
         ]
         
         simbolos_simples = ['{', '}', '(', ')', ';', ',', ':']
@@ -70,10 +66,52 @@ class Lexico:
                 if buffer: self._guardar_buffer(buffer, numero_linea_actual, PALABRAS_CLAVE); buffer = ''
                 self.tokens.append(caracter)
                 self.numeros_de_linea.append(numero_linea_actual)
+            elif caracter == "'":
+                if buffer: self._guardar_buffer(buffer, numero_linea_actual, PALABRAS_CLAVE); buffer = ''
+                
+                char_token = "'" 
+                i += 1
+                
+                if i < len(self.fuente):
+                    char_token += self.fuente[i] 
+                    i += 1
+                
+                if i < len(self.fuente) and self.fuente[i] == "'":
+                    char_token += "'"
+                    self.tokens.append(char_token)
+                    self.numeros_de_linea.append(numero_linea_actual)
+                else:
+                    self.tokens.append(f"INVALIDO({char_token})")
+                    self.numeros_de_linea.append(numero_linea_actual)
+                
+                i += 1 
+                continue 
             elif caracter in simbolos_simples:
                 if buffer: self._guardar_buffer(buffer, numero_linea_actual, PALABRAS_CLAVE); buffer = ''
                 self.tokens.append(caracter)
                 self.numeros_de_linea.append(numero_linea_actual)
+            elif caracter == '"':
+                if buffer: self._guardar_buffer(buffer, numero_linea_actual, PALABRAS_CLAVE); buffer = ''
+                string_token = '"' 
+                i += 1 
+                # Bucle para consumir la cadena
+                while i < len(self.fuente):
+                    char_str = self.fuente[i]
+                    string_token += char_str
+                    
+                    if char_str == '\n':
+                        numero_linea_actual += 1
+                    
+                    i += 1
+
+                    if char_str == '"':
+                        break 
+                    if char_str == '\\' and i < len(self.fuente) and self.fuente[i] == '"':
+                        string_token += self.fuente[i] 
+                        i += 1 
+                self.tokens.append(string_token) 
+                self.numeros_de_linea.append(numero_linea_actual)
+                continue 
             elif caracter.isspace():
                 if buffer: self._guardar_buffer(buffer, numero_linea_actual, PALABRAS_CLAVE); buffer = ''
                 if caracter == '\n':
