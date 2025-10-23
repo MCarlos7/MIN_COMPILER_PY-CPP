@@ -33,7 +33,7 @@ class Lexico:
     def _tokenizar(self):
         PALABRAS_CLAVE = [
             'int', 'main', 'if', 'else', 'switch', 'case', 'default', 'break',
-            'cin', 'cout', 'return', 'while', 'for', 'char', 'float', 'double',
+            'cin', 'cout', 'return', 'while', 'for', 'char', 'float', 'double', 'do'
         ]
         
         simbolos_simples = ['{', '}', '(', ')', ';', ',', ':']
@@ -49,10 +49,10 @@ class Lexico:
                 buffer += caracter
             elif caracter.isdigit():
                 buffer += caracter
-            elif caracter in "<>=!": # Posibles operadores de dos caracteres
+            elif caracter in "<>=!+-":
                 if buffer: self._guardar_buffer(buffer, numero_linea_actual, PALABRAS_CLAVE); buffer = ''
-                
                 op = caracter
+                
                 if i + 1 < len(self.fuente) and self.fuente[i+1] == '=':
                     op += '='
                     i += 1
@@ -60,8 +60,13 @@ class Lexico:
                     op += caracter
                     i += 1
                 
+                elif caracter in "+-" and i + 1 < len(self.fuente) and self.fuente[i+1] == caracter:
+                    op += caracter
+                    i += 1
+                
                 self.tokens.append(op)
                 self.numeros_de_linea.append(numero_linea_actual)
+                
             elif caracter in "+-*/%": # Operadores de un caracter
                 if buffer: self._guardar_buffer(buffer, numero_linea_actual, PALABRAS_CLAVE); buffer = ''
                 self.tokens.append(caracter)

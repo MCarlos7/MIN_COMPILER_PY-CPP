@@ -37,8 +37,19 @@ class GeneraCodigo:
     
     def jump_false(self, label): print(f"Salto si es falso a {label}")
     def jump(self, label): print(f"Salto incondicional a {label}")
+    def jump_true(self, label): 
+        print(f"Salto si es verdadero a {label}")
     def label(self, label): print(f"ETIQUETA {label}:")
     
     def switch_begin(self): print("Iniciando bloque switch")
     def switch_end(self): print("Finalizando bloque switch")
     def case_begin(self, value): print(f"Evaluando case para el valor: {value}")
+    
+    def post_inc(self):
+        print("Incrementando valor (post-fijo)")
+    def post_dec(self):
+        print("Decrementando valor (post-fijo)")
+    def pre_inc(self):
+        print("Incrementando valor (pre-fijo)")    
+    def pre_dec(self):
+        print("Decrementando valor (pre-fijo)")

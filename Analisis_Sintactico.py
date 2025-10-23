@@ -5,7 +5,7 @@ from GeneraCodigo import GeneraCodigo
 
 class Sintactico:
     """
-    Analizador Sintáctico para una sintaxis similar a C++.
+    Analizador Sintáctico para una sintaxis de C++.
     """
     def __init__(self, fuente, salida=None, traza=False):
         self.lexico = Lexico(fuente, traza)
@@ -13,6 +13,7 @@ class Sintactico:
         self.automata = Automata()
         self.token = ''
         self.traza = traza
+        self.loop_exit_stack = []
         print("INICIO DE ANALISIS SINTACTICO")
         self.programa()
         print("FIN DE ANALISIS SINTACTICO")
@@ -36,7 +37,10 @@ class Sintactico:
             14: ": SE ESPERABA '='",
             15: ": SE ESPERABA UNA CONSTANTE NUMERICA",
             16: ": SE ESPERABA UN CARACTER LITERAL (ej: 'A')",
-            17: ": SE ESPERABA UNA CONSTANTE (NUMERO o CHAR) PARA EL CASE"
+            17: ": SE ESPERABA UNA CONSTANTE (NUMERO o CHAR) PARA EL CASE.",
+            18: ": 'break' FUERA DE LUGAR (NO ESTA DENTRO DE UN BUCLE O SWITCH)",
+            19: ": SE ESPERABA '++' o '--'",
+            20: ": SE ESPERABA UN OPERADOR DE ASIGNACION (=, ++, --)"
         }
         mensaje = f"LINEA {self.lexico.lineaActual()} ERROR SINTACTICO {codigo_error}{errores_msg.get(codigo_error, ': ERROR DESCONOCIDO')}"
         print(mensaje)
@@ -57,6 +61,7 @@ class Sintactico:
             elif token_esperado == ':': self.errores(12)
             elif token_esperado in ['<<', '>>']: self.errores(13)
             elif token_esperado == '=': self.errores(14)
+            elif token_esperado in ['++', '--']: self.errores(19)
             else:
                 mensaje = f"LINEA {self.lexico.lineaActual()} ERROR SINTACTICO: Se esperaba '{token_esperado}' pero se encontró '{self.token}'"
                 print(mensaje)
@@ -96,6 +101,12 @@ class Sintactico:
             self.sentencia_cout()
         elif self.token == 'int' or self.token == 'char':
             self.declaracion()
+        elif self.token == 'while':
+            self.sentencia_while()
+        elif self.token == 'do':
+            self.sentencia_do_while()
+        elif self.token == 'for':
+            self.sentencia_for()
         elif self.token == 'break':
             self.sentencia_break()
         elif self.automata.es_valido(self.token):
@@ -103,10 +114,14 @@ class Sintactico:
         else:
             self.errores(9)
 
-    # --- CAMBIO 2: CREAR UN MÉTODO PARA LA SENTENCIA 'break' ---
     def sentencia_break(self):
         if self.traza: print("ANALISIS SINTACTICO: <BREAK>")
         self.parea('break')
+        if not self.loop_exit_stack:
+            self.errores(18) 
+        else:
+            exit_label = self.loop_exit_stack[-1] 
+            self.generaCodigo.jump(exit_label)
         self.parea(';')
 
     def declaracion(self):
@@ -150,11 +165,27 @@ class Sintactico:
     
     def asignacion(self):
         if self.traza: print("ANALISIS SINTACTICO: <ASIGNACION>")
-        self.variable()
-        self.parea('=')
-        self.expresion()
-        self.parea(';')
-        self.generaCodigo.store()
+        
+        self.variable() 
+        
+        if self.token == '=':
+            self.parea('=')
+            self.expresion()
+            self.parea(';')
+            self.generaCodigo.store()
+        
+        elif self.token in ['++', '--']:
+            op = self.token
+            self.parea(op)
+            if op == '++':
+                self.generaCodigo.post_inc()
+            else:
+                self.generaCodigo.post_dec()
+            
+            self.parea(';')
+        
+        else:
+            self.errores(20)
 
     def sentencia_if(self):
         if self.traza: print("ANALISIS SINTACTICO: <SENTENCIA_IF>")
@@ -195,6 +226,9 @@ class Sintactico:
 
     def sentencia_switch(self):
         if self.traza: print("ANALISIS SINTACTICO: <SENTENCIA_SWITCH>")
+        
+        etiqueta_fin = self.generaCodigo.nueva_etiqueta()
+        self.loop_exit_stack.append(etiqueta_fin)
         self.parea('switch')
         self.parea('(')
         self.expresion()
@@ -206,6 +240,8 @@ class Sintactico:
         if self.token == 'default':
             self.caso_default()
         self.parea('}')
+        self.generaCodigo.label(etiqueta_fin) 
+        self.loop_exit_stack.pop() 
         self.generaCodigo.switch_end()
         
     def bloque_case(self):
@@ -322,4 +358,230 @@ class Sintactico:
             self.generaCodigo.pushc(self.token)
             self.token = self.lexico.siguienteToken()
         else:
-            self.errores(15) # <-- CORREGIDO
+            self.errores(15) 
+    
+    def expresion_incremento(self):
+        """
+        Analiza la 3ra parte de un 'for'.
+        Maneja: asignacion (i=i+1), post-fijo (i++), o pre-fijo (++i).
+        """
+        if self.traza: print("ANALISIS SINTACTICO: <EXPRESION_INCREMENTO>")
+        
+        if self.token in ['++', '--']:
+            # --- Caso: Pre-fijo (++var) ---
+            op = self.token
+            self.parea(op) # Consume '++'
+            
+            if not self.automata.es_valido(self.token):
+                self.errores(8) # Se esperaba variable
+            
+            self.variable() # Consume 'var', hace pusha
+            
+            if op == '++':
+                self.generaCodigo.pre_inc()
+            else:
+                self.generaCodigo.pre_dec()
+        
+        elif self.automata.es_valido(self.token):
+            # --- Caso: Asignación (var = expr) o Post-fijo (var++) ---
+            self.variable() # Consume 'var', hace pusha
+            
+            if self.token == '=':
+                # --- Asignación simple (var = expr) ---
+                self.parea('=')
+                self.expresion()
+                self.generaCodigo.store()
+            elif self.token in ['++', '--']:
+                # --- Post-fijo (var++) ---
+                op = self.token
+                self.parea(op)
+                if op == '++':
+                    self.generaCodigo.post_inc()
+                else:
+                    self.generaCodigo.post_dec()
+            else:
+                self.errores(20) # Se esperaba =, ++, o --
+        
+        elif self.token == ')':
+            # --- Caso: Expresión vacía (for(;;)) ---
+            pass # No hacer nada
+        
+        else:
+            self.errores(9) # Sentencia no reconocida
+    
+    def declaracion_simple(self):
+        """
+        Helper para 'for': Analiza una declaración SIN el punto y coma.
+        Gramática: <tipo> <variable> [ = <expresion> ]
+        """
+        if self.traza: print("ANALISIS SINTACTICO: <DECLARACION_SIMPLE>")
+        
+        tipo_token = self.token
+        if tipo_token == 'int':
+            self.parea('int')
+        elif tipo_token == 'char':
+            self.parea('char')
+        
+        self.variable() 
+        
+        if self.token == '=':
+            self.parea('=')
+            if tipo_token == 'int':
+                self.expresion()
+            elif tipo_token == 'char':
+                self.valor_char()
+            self.generaCodigo.store()
+            
+    def sentencia_while(self):
+        """
+        Analiza la gramática: while ( <condicion> ) { <bloque> }
+        """
+        if self.traza: print("ANALISIS SINTACTICO: <SENTENCIA_WHILE>")
+        
+        etiqueta_inicio = self.generaCodigo.nueva_etiqueta()
+        etiqueta_fin = self.generaCodigo.nueva_etiqueta()
+
+        self.loop_exit_stack.append(etiqueta_fin)
+        
+        self.generaCodigo.label(etiqueta_inicio) 
+        
+        self.parea('while')
+        self.parea('(')
+        self.condicion()                          
+        self.parea(')')
+        
+        self.generaCodigo.jump_false(etiqueta_fin) 
+        
+        self.parea('{')
+        self.bloque()                             
+        self.parea('}')
+        
+        self.generaCodigo.jump(etiqueta_inicio)   
+        
+        self.generaCodigo.label(etiqueta_fin)     
+        self.loop_exit_stack.pop()                
+
+
+    def sentencia_do_while(self):
+        """
+        Analiza la gramática: do { <bloque> } while ( <condicion> ) ;
+        """
+        if self.traza: print("ANALISIS SINTACTICO: <SENTENCIA_DO_WHILE>")
+        
+        etiqueta_inicio = self.generaCodigo.nueva_etiqueta()
+        etiqueta_fin = self.generaCodigo.nueva_etiqueta()
+
+        self.loop_exit_stack.append(etiqueta_fin)
+        
+        self.parea('do')
+        self.parea('{')
+        
+        self.generaCodigo.label(etiqueta_inicio) 
+        self.bloque()                         
+        
+        self.parea('}')
+        self.parea('while')
+        self.parea('(')
+        self.condicion()                      
+        self.parea(')')
+        self.parea(';')
+        
+        self.generaCodigo.jump_true(etiqueta_inicio) 
+        
+        self.generaCodigo.label(etiqueta_fin)     
+        self.loop_exit_stack.pop()                
+
+
+    def asignacion_simple(self):
+        """
+        Helper para 'for': Analiza una asignación SIN el punto y coma.
+        Gramática: <variable> = <expresion>
+        """
+        if self.traza: print("ANALISIS SINTACTICO: <ASIGNACION_SIMPLE>")
+        if self.automata.es_valido(self.token):
+            self.variable()
+            self.parea('=')
+            self.expresion()
+            self.generaCodigo.store()
+        else:
+            pass 
+
+
+    def sentencia_for(self):
+        """
+        Analiza la gramática: for ( [asig_simple] ; [condicion] ; [asig_simple] ) { <bloque> }
+        Traducción:
+            <asig_simple_1> (inicializador)
+            L_COND:
+            <condicion>
+            JUMP_FALSE L_FIN
+            { <bloque> }
+            L_INC:
+            <asig_simple_2> (incremento)
+            JUMP L_COND
+            L_FIN:
+        """
+        if self.traza: print("ANALISIS SINTACTICO: <SENTENCIA_FOR>")
+        
+        etiqueta_cond = self.generaCodigo.nueva_etiqueta()
+        etiqueta_inc = self.generaCodigo.nueva_etiqueta()
+        etiqueta_fin = self.generaCodigo.nueva_etiqueta()
+
+        self.loop_exit_stack.append(etiqueta_fin)
+        
+        self.parea('for')
+        self.parea('(')
+        
+        # --- 1. Inicializador ---
+        if self.token != ';':
+            # Comprobar si es una declaración o una asignación
+            if self.token == 'int' or self.token == 'char':
+                self.declaracion_simple() # Analiza 'int i = 0'
+            elif self.automata.es_valido(self.token):
+                self.asignacion_simple() # Analiza 'i = 0'
+            else:
+                # Si es otra cosa (ej: 'cout'), el parea(';') fallará
+                pass
+        
+        self.parea(';')
+        
+        # --- 2. Condición ---
+        self.generaCodigo.label(etiqueta_cond)
+        if self.token != ';':
+            self.condicion()
+            self.generaCodigo.jump_false(etiqueta_fin) 
+        self.parea(';')
+        
+        # --- 3. Incremento (Manejo Complejo) ---
+        indice_incremento = self.lexico.idx_token_actual
+        
+        while self.token != ')' and self.token != 'EOF':
+            self.token = self.lexico.siguienteToken()
+        if self.token == 'EOF': self.errores(4) 
+        
+        self.parea(')') 
+        
+        # --- 4. Bloque ---
+        self.parea('{')
+        self.bloque()
+        self.parea('}')
+        
+        # --- 5. Ejecutar Incremento ---
+        self.generaCodigo.label(etiqueta_inc)
+        
+        indice_actual = self.lexico.idx_token_actual 
+        
+        self.lexico.idx_token_actual = indice_incremento - 1
+        self.token = self.lexico.siguienteToken()
+        
+        if self.token != ')': # Si hay una expresión de incremento
+            self.expresion_incremento() 
+        
+        self.lexico.idx_token_actual = indice_actual - 1
+        self.token = self.lexico.siguienteToken()
+        
+        # --- 6. Salto final ---
+        self.generaCodigo.jump(etiqueta_cond)
+        
+        self.generaCodigo.label(etiqueta_fin) 
+        self.loop_exit_stack.pop()
