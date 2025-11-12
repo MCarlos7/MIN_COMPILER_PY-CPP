@@ -36,7 +36,7 @@ class Lexico:
             'cin', 'cout', 'return', 'while', 'for', 'char', 'float', 'double', 'do'
         ]
         
-        simbolos_simples = ['{', '}', '(', ')', ';', ',', ':']
+        simbolos_simples = ['{', '}', '(', ')', ';', ',', ':', '[', ']']
         
         buffer = ''
         numero_linea_actual = 1

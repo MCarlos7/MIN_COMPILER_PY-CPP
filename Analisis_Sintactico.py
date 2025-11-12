@@ -133,9 +133,16 @@ class Sintactico:
         elif tipo_token == 'char':
             self.parea('char')
 
-        self.variable()
+        self.variable() 
 
-        if self.token == '=':
+        if self.token == '[':
+            self.parea('[')
+            # NOTA: Esto solo permite tamaños constantes, ej: int a[10];
+            # Para 'int a[i];' (tamaño variable) se necesitaría más lógica.
+            self.constante() 
+            self.parea(']')
+        
+        elif self.token == '=':
             self.parea('=')
             if tipo_token == 'int':
                 self.expresion() 
@@ -165,8 +172,7 @@ class Sintactico:
     
     def asignacion(self):
         if self.traza: print("ANALISIS SINTACTICO: <ASIGNACION>")
-        
-        self.variable() 
+        self.variable()
         
         if self.token == '=':
             self.parea('=')
@@ -181,8 +187,20 @@ class Sintactico:
                 self.generaCodigo.post_inc()
             else:
                 self.generaCodigo.post_dec()
-            
             self.parea(';')
+        
+        elif self.token == '[':
+            self.parea('[')
+            self.expresion()
+            self.parea(']')
+            
+            self.generaCodigo.index_address() 
+            
+            self.parea('=')
+            self.expresion()
+            self.parea(';')
+            
+            self.generaCodigo.store()
         
         else:
             self.errores(20)
@@ -344,9 +362,18 @@ class Sintactico:
             self.expresion()
             self.parea(')')
         elif self.automata.es_valido(self.token):
-            self.generaCodigo.pusha(self.token)
-            self.generaCodigo.load()
-            self.token = self.lexico.siguienteToken()
+            self.variable()
+            
+            if self.token == '[':
+                self.parea('[')
+                self.expresion() 
+                self.parea(']')
+                
+                self.generaCodigo.index_load()
+            
+            else:
+                self.generaCodigo.load()
+        
         elif self.token.isdigit():
             self.constante()
         else:

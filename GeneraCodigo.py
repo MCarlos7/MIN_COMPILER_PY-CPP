@@ -53,3 +53,8 @@ class GeneraCodigo:
         print("Incrementando valor (pre-fijo)")    
     def pre_dec(self):
         print("Decrementando valor (pre-fijo)")
+    def index_address(self):
+        print("Calculando dirección de índice para almacenar")
+    def index_load(self):
+        print("Calculando dirección de índice para cargar")
+
