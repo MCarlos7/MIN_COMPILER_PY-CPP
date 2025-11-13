@@ -222,11 +222,11 @@ class App(tk.Tk):
         return "break"
     
     def copy_text(self, event=None):
-        self.editor.event_generate("<<Copy>>")
+        #self.editor.event_generate("<<Copy>>")
         return "break"
 
     def paste_text(self, event=None):
-        self.editor.event_generate("<<Paste>>")
+        #self.editor.event_generate("<<Paste>>")
         self._update_line_numbers()
         return "break"
 
@@ -235,7 +235,7 @@ class App(tk.Tk):
         return "break"
 
     def undo(self, event=None):
-        self.editor.event_generate("<<Undo>>")
+        #self.editor.event_generate("<<Undo>>")
         return "break"
 
     def redo(self, event=None):
@@ -311,7 +311,7 @@ class App(tk.Tk):
         output_final = redirected_output.getvalue()
         self.write_to_console(output_final)
     
-    # --- MÉTODO DE ANÁLISIS SEMÁNTICO (ACTUALIZADO) ---
+    # --- MÉTODO DE ANÁLISIS SEMÁNTICO---
     def Analisis_Semantico(self, event=None):
         source_code = self.editor.get("1.0", tk.END)
         if not source_code.strip():

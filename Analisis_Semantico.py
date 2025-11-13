@@ -50,3 +50,38 @@ class AnalizadorSemantico:
                 salida += f" - {e}\n"
 
         return salida
+    
+class SemanticError(Exception):
+    def __init__(self, mensaje, linea):
+        super().__init__(f"LINEA {linea} ERROR SEMANTICO: {mensaje}")
+        self.linea = linea
+
+class TablaSimbolos:
+    def __init__(self):
+        self.ambitos = [{}]
+        self.errores = []
+
+    def entrar_ambito(self):
+        self.ambitos.append({})
+
+    def salir_ambito(self):
+        if len(self.ambitos) > 1:
+            self.ambitos.pop()
+        else:
+            print("Error: Intentando salir del ámbito global")
+
+    def declarar(self, nombre, tipo, linea):
+        ambito_actual = self.ambitos[-1]
+        if nombre in ambito_actual:
+            raise SemanticError(f"Variable '{nombre}' ya ha sido declarada en este ámbito.", linea)
+        
+        ambito_actual[nombre] = {'tipo': tipo}
+        if (False): 
+            print(f"[TablaSimbolos] Declarada '{nombre}' (Tipo: {tipo}) en ámbito {len(self.ambitos)-1}")
+
+    def buscar(self, nombre, linea):
+        for ambito in reversed(self.ambitos):
+            if nombre in ambito:
+                return ambito[nombre]['tipo']
+        
+        raise SemanticError(f"Variable '{nombre}' no ha sido declarada.", linea)
