@@ -159,7 +159,9 @@ class Sintactico:
 
         if self.token == '[':
             self.parea('[')
-            self.constante() 
+            tipo_expr_tamano = self.expresion() 
+            if tipo_expr_tamano != 'int':
+                self.error_semantico(f"El tamaño del arreglo debe ser una expresión de tipo 'int', pero se encontró '{tipo_expr_tamano}'.")
             self.parea(']')
         
         elif self.token == '=':
@@ -341,8 +343,16 @@ class Sintactico:
     def sentencia_cin(self):
         if self.traza: print("ANALISIS SINTACTICO: <CIN>")
         self.parea('cin')
-        self.parea('>>')
-        self.variable() 
+        while self.token == '>>':
+            self.parea('>>')
+            nombre_variable = self.token
+            self.variable() 
+            if self.token == '[':
+                self.parea('[')
+                self.expresion() 
+                self.parea(']')
+                self.generaCodigo.index_address()
+            self.generaCodigo.input(nombre_variable)
         self.parea(';')
         
     def sentencia_cout(self):
