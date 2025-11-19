@@ -59,7 +59,7 @@ class SemanticError(Exception):
 class TablaSimbolos:
     def __init__(self):
         self.ambitos = [{}]
-        self.errores = []
+        self.funciones = {} 
 
     def entrar_ambito(self):
         self.ambitos.append({})
@@ -73,15 +73,24 @@ class TablaSimbolos:
     def declarar(self, nombre, tipo, linea):
         ambito_actual = self.ambitos[-1]
         if nombre in ambito_actual:
-            raise SemanticError(f"Variable '{nombre}' ya ha sido declarada en este ámbito.", linea)
-        
+            raise SemanticError(f"Variable '{nombre}' ya declarada.", linea)
         ambito_actual[nombre] = {'tipo': tipo}
-        if (False): 
-            print(f"[TablaSimbolos] Declarada '{nombre}' (Tipo: {tipo}) en ámbito {len(self.ambitos)-1}")
+
+    def declarar_funcion(self, nombre, tipo_retorno, parametros, linea):
+        if nombre in self.funciones:
+             raise SemanticError(f"Función '{nombre}' ya definida.", linea)
+        self.funciones[nombre] = {
+            'tipo': tipo_retorno,
+            'params': parametros 
+        }
+
+    def buscar_funcion(self, nombre, linea):
+        if nombre not in self.funciones:
+             raise SemanticError(f"Función '{nombre}' no declarada.", linea)
+        return self.funciones[nombre]
 
     def buscar(self, nombre, linea):
         for ambito in reversed(self.ambitos):
             if nombre in ambito:
                 return ambito[nombre]['tipo']
-        
-        raise SemanticError(f"Variable '{nombre}' no ha sido declarada.", linea)
+        raise SemanticError(f"Variable '{nombre}' no declarada.", linea)

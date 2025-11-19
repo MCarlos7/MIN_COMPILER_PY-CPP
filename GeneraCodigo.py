@@ -57,4 +57,12 @@ class GeneraCodigo:
         print("Calculando dirección de índice para almacenar")
     def index_load(self):
         print("Calculando dirección de índice para cargar")
+    def function_label(self, name): 
+        print(f"\nFUNC_START {name}:")
+    def return_val(self): 
+        print("RETURN")
+    def call_function(self, name): 
+        print(f"CALL {name}")
+    def push_param(self, param_name):
+        print(f"PUSH_PARAM {param_name}")
 

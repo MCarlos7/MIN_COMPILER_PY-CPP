@@ -1,0 +1,9 @@
+int suma(int a, int b) {
+    return a + b;
+}
+
+int main() {
+    int x;
+    x = suma(5, 10);
+    cout << x;
+}

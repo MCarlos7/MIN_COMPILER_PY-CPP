@@ -88,21 +88,108 @@ class Sintactico:
     def programa(self):
         if self.traza: print("ANALISIS SINTACTICO: <PROGRAMA>")
         self.token = self.lexico.siguienteToken()
-        self.parea('int')
-        self.parea('main')
+        while self.token != 'EOF':
+            if self.token in ['int', 'char', 'void', 'float', 'double']:
+                self.definicion_funcion()
+            else:
+                print(f"Error fatal en linea {self.lexico.lineaActual()}. Token inesperado: {self.token}")
+                self.errores(9) 
+        self.generaCodigo.end()
+        
+    def definicion_funcion(self):
+        if self.traza: print("ANALISIS SINTACTICO: <DEF_FUNCION>")
+        
+        tipo_retorno = self.token
+        self.token = self.lexico.siguienteToken() 
+        
+        nombre_func = self.token
+        if not self.automata.es_valido(nombre_func):
+            self.errores(8) 
+        self.token = self.lexico.siguienteToken()
+
         self.parea('(')
+        
+        parametros = [] 
+        tipos_params = [] 
+        
+        if self.token != ')':
+            while True:
+                tipo_param = self.token
+                if tipo_param not in ['int', 'char']:
+                     self.errores(1)
+                self.token = self.lexico.siguienteToken()
+                
+                nombre_param = self.token
+                self.token = self.lexico.siguienteToken()
+                
+                parametros.append((nombre_param, tipo_param))
+                tipos_params.append(tipo_param)
+                
+                if self.token == ',':
+                    self.parea(',')
+                else:
+                    break
+        
         self.parea(')')
+
+        self.tabla_simbolos.declarar_funcion(nombre_func, tipo_retorno, tipos_params, self.lexico.lineaActual())
+        self.generaCodigo.function_label(nombre_func)
+
         self.parea('{')
-        self.tabla_simbolos.entrar_ambito() 
-        self.generaCodigo.code()
-        self.bloque()
+        self.tabla_simbolos.entrar_ambito()
+        
+        for p_nombre, p_tipo in parametros:
+            self.tabla_simbolos.declarar(p_nombre, p_tipo, self.lexico.lineaActual())
+        
+        self.bloque() 
+
         if self.token == 'return':
             self.parea('return')
-            self.expresion()
+            tipo_expr = self.expresion()
+            if tipo_expr != tipo_retorno:
+                self.error_semantico(f"Tipo de retorno incorrecto en '{nombre_func}'. Esperaba {tipo_retorno}, obtuvo {tipo_expr}")
             self.parea(';')
+            self.generaCodigo.return_val()
+
+        self.tabla_simbolos.salir_ambito()
         self.parea('}')
-        self.tabla_simbolos.salir_ambito() 
-        self.generaCodigo.end()
+        
+    def llamada_funcion(self, nombre_func):
+        if self.traza: print("ANALISIS SINTACTICO: <LLAMADA_FUNCION>")
+        
+        info_func = self.tabla_simbolos.buscar_funcion(nombre_func, self.lexico.lineaActual())
+        tipos_params_esperados = info_func['params']
+        
+        self.parea('(')
+        
+        argumentos_encontrados = 0
+        if self.token != ')':
+            while True:
+                if argumentos_encontrados >= len(tipos_params_esperados):
+                    self.error_semantico(f"Demasiados argumentos para la función '{nombre_func}'.")
+                
+                tipo_arg = self.expresion()
+                tipo_esperado = tipos_params_esperados[argumentos_encontrados]
+                
+                if tipo_arg != tipo_esperado:
+                    self.error_semantico(f"Argumento {argumentos_encontrados+1} de '{nombre_func}' no coincide. Esperaba {tipo_esperado}, recibió {tipo_arg}")
+                
+                self.generaCodigo.push_param(f"arg_{argumentos_encontrados}")
+                
+                argumentos_encontrados += 1
+                
+                if self.token == ',':
+                    self.parea(',')
+                else:
+                    break
+        
+        if argumentos_encontrados < len(tipos_params_esperados):
+             self.error_semantico(f"Faltan argumentos para la función '{nombre_func}'.")
+
+        self.parea(')')
+        self.generaCodigo.call_function(nombre_func)
+        
+        return info_func['tipo'] 
 
     def bloque(self):
         if self.traza: print("ANALISIS SINTACTICO: <BLOQUE>")
@@ -131,6 +218,17 @@ class Sintactico:
             self.sentencia_break()
         elif self.automata.es_valido(self.token):
             self.asignacion()
+        elif self.automata.es_valido(self.token):
+            nombre = self.token
+            siguiente = self.lexico.siguienteToken() 
+            self.lexico.devuelveToken() 
+            
+            if siguiente == '(':
+                self.token = nombre
+                self.llamada_funcion(nombre)
+                self.parea(';')
+            else:
+                self.asignacion()
         else:
             self.errores(9)
 
@@ -427,7 +525,6 @@ class Sintactico:
         if self.token.startswith('"') and self.token.endswith('"'):
             self.generaCodigo.push_string(self.token) 
             self.token = self.lexico.siguienteToken()
-
             return 'string' 
             
         elif len(self.token) == 3 and self.token.startswith("'") and self.token.endswith("'"):
@@ -438,22 +535,32 @@ class Sintactico:
             tipo_expr = self.expresion()
             self.parea(')')
             return tipo_expr 
-            
-        elif self.automata.es_valido(self.token):
-            tipo_var = self.variable() 
-            
-            if self.token == '[':
-                self.parea('[')
-                self.expresion() 
-                self.parea(']')
-                self.generaCodigo.index_load()
-            else:
-                self.generaCodigo.load()
-            
-            return tipo_var 
-        
         elif self.token.isdigit():
-            return self.constante() 
+            return self.constante()
+        elif self.automata.es_valido(self.token):
+            nombre = self.token
+            
+            siguiente = self.lexico.siguienteToken()
+            
+            if siguiente == '(':
+                self.token = siguiente 
+                return self.llamada_funcion(nombre)
+            
+            else:
+                self.lexico.devuelveToken() 
+                self.token = nombre 
+                tipo_var = self.variable()
+                
+                if self.token == '[':
+                    self.parea('[')
+                    self.expresion() 
+                    self.parea(']')
+                    self.generaCodigo.index_load() 
+                else:
+                    self.generaCodigo.load()       
+                
+                return tipo_var 
+                
         else:
             self.errores(8)
 

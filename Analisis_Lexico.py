@@ -33,7 +33,8 @@ class Lexico:
     def _tokenizar(self):
         PALABRAS_CLAVE = [
             'int', 'main', 'if', 'else', 'switch', 'case', 'default', 'break',
-            'cin', 'cout', 'return', 'while', 'for', 'char', 'float', 'double', 'do'
+            'cin', 'cout', 'return', 'while', 'for', 'char', 'float', 'double', 'do',
+            'void'
         ]
         
         simbolos_simples = ['{', '}', '(', ')', ';', ',', ':', '[', ']']
