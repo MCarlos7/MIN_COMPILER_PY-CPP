@@ -34,10 +34,10 @@ class Lexico:
         PALABRAS_CLAVE = [
             'int', 'main', 'if', 'else', 'switch', 'case', 'default', 'break',
             'cin', 'cout', 'return', 'while', 'for', 'char', 'float', 'double', 'do',
-            'void'
+            'void', 'class', 'public', 'private'
         ]
         
-        simbolos_simples = ['{', '}', '(', ')', ';', ',', ':', '[', ']']
+        simbolos_simples = ['{', '}', '(', ')', ';', ',', ':', '[', ']','.']
         
         buffer = ''
         numero_linea_actual = 1
