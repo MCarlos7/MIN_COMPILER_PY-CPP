@@ -8,61 +8,113 @@ class GeneraCodigo:
         self.label_count += 1
         return f"L{self.label_count}"
 
-    def code(self): print("Generando código para main")
-    def end(self): print("Fin del programa") 
-    def pusha(self, token): print(f"Push variable: {token}")
-    def pushc(self, token): 
-        print(f"Push constante: {token}")
-    def push_string(self, string_literal):
-        print(f"Push string: {string_literal}")
-    def push_char(self, char_literal):
-        print(f"Push char: {char_literal}")
-    def store(self): print("Almacenando valor")
-    def load(self): print("Cargando valor de variable")
-    def add(self): print("Sumando")
-    def neg(self): print("Negando valor")
-    def mul(self): print("Multiplicando")
-    def div(self): print("Dividiendo")
-    def mod(self): print("Calculando módulo")
-    def input(self, token): print(f"Leyendo entrada para: {token}")
-    def output(self, token): print(f"Escribiendo salida de: {token}") 
-    def out(self):
-        print("Escribiendo valor de la pila en la salida")
-    def cmp_equal(self): print("Comparando por igualdad (==)")
-    def cmp_notequal(self): print("Comparando por desigualdad (!=)")
-    def cmp_less(self): print("Comparando por menor que (<)")
-    def cmp_greater(self): print("Comparando por mayor que (>)")
-    def cmp_lessequal(self): print("Comparando por menor o igual que (<=)")
-    def cmp_greaterequal(self): print("Comparando por mayor o igual que (>=)")
-    
-    def jump_false(self, label): print(f"Salto si es falso a {label}")
-    def jump(self, label): print(f"Salto incondicional a {label}")
-    def jump_true(self, label): 
-        print(f"Salto si es verdadero a {label}")
-    def label(self, label): print(f"ETIQUETA {label}:")
-    
-    def switch_begin(self): print("Iniciando bloque switch")
-    def switch_end(self): print("Finalizando bloque switch")
-    def case_begin(self, value): print(f"Evaluando case para el valor: {value}")
-    
-    def post_inc(self):
-        print("Incrementando valor (post-fijo)")
-    def post_dec(self):
-        print("Decrementando valor (post-fijo)")
-    def pre_inc(self):
-        print("Incrementando valor (pre-fijo)")    
-    def pre_dec(self):
-        print("Decrementando valor (pre-fijo)")
-    def index_address(self):
-        print("Calculando dirección de índice para almacenar")
-    def index_load(self):
-        print("Calculando dirección de índice para cargar")
-    def function_label(self, name): 
-        print(f"\nFUNC_START {name}:")
-    def return_val(self): 
-        print("RETURN")
-    def call_function(self, name): 
-        print(f"CALL {name}")
-    def push_param(self, param_name):
-        print(f"PUSH_PARAM {param_name}")
+    def _emit(self, instruccion, argumento=""):
+        """Método auxiliar para imprimir instrucciones alineadas."""
+        if argumento:
+            print(f"{instruccion:<3} {argumento}")
+        else:
+            print(f"{instruccion}")
 
+    # --- Estructura General ---
+    def code(self): 
+        print(f"; {'='*30}")
+        print(f"; {'INICIO DE CODIGO INTERMEDIO':^30}")
+        print(f"; {'='*30}")
+
+    def end(self): 
+        print(f"; {'='*30}")
+        print(f"; {'FIN DEL PROGRAMA':^30}") 
+        print(f"; {'='*30}")
+        self._emit("HALT")
+
+    # --- Operaciones de Pila y Datos ---
+    def pusha(self, token): 
+        self._emit("PUSHA", token)  # Push Address (Variable)
+
+    def pushc(self, token): 
+        self._emit("PUSHC", token)  # Push Constant (Número)
+
+    def push_string(self, string_literal):
+        self._emit("PUSH_STR", string_literal)
+
+    def push_char(self, char_literal):
+        self._emit("PUSH_CHAR", char_literal)
+
+    def store(self): 
+        self._emit("STORE")  # Guarda valor de tope de pila en dirección
+
+    def load(self): 
+        self._emit("LOAD")   # Carga valor de dirección en tope de pila
+
+    # --- Aritmética ---
+    def add(self): self._emit("ADD")
+    def neg(self): self._emit("NEG")
+    def mul(self): self._emit("MUL")
+    def div(self): self._emit("DIV")
+    def mod(self): self._emit("MOD")
+
+    # --- Incrementos / Decrementos ---
+    def post_inc(self): self._emit("INC_POST") # Incremento post-fijo (i++)
+    def post_dec(self): self._emit("DEC_POST")
+    def pre_inc(self):  self._emit("INC_PRE")  # Incremento pre-fijo (++i)
+    def pre_dec(self):  self._emit("DEC_PRE")
+
+    # --- Entrada / Salida ---
+    def input(self, token): 
+        self._emit("IN", token)
+
+    def output(self, token): 
+        self._emit("OUT_LIT", token) # Imprimir literal (ej. "Hola")
+
+    def out(self):
+        self._emit("OUT_VAL") # Imprimir valor del tope de la pila
+
+    # --- Comparaciones (Dejan 1 o 0 en la pila) ---
+    def cmp_equal(self):        self._emit("EQ")   # ==
+    def cmp_notequal(self):     self._emit("NEQ")  # !=
+    def cmp_less(self):         self._emit("LT")   # <
+    def cmp_greater(self):      self._emit("GT")   # >
+    def cmp_lessequal(self):    self._emit("LTE")  # <=
+    def cmp_greaterequal(self): self._emit("GTE")  # >=
+    
+    # --- Control de Flujo (Saltos) ---
+    def label(self, label): 
+        print(f"{label}:") # Las etiquetas no llevan identación
+
+    def jump(self, label): 
+        self._emit("JMP", label) # Salto incondicional
+
+    def jump_false(self, label): 
+        self._emit("JMPF", label) # Salto si Falso (Tope == 0)
+
+    def jump_true(self, label): 
+        self._emit("JMPT", label) # Salto si Verdadero
+
+    def switch_begin(self): 
+        print("; --- SWITCH BEGIN ---")
+
+    def switch_end(self): 
+        print("; --- SWITCH END ---")
+
+    def case_begin(self, value): 
+        print(f"; CASE {value}:")
+    
+    # --- Arreglos ---
+    def index_address(self):
+        self._emit("IDX_ADDR") # Calcular dirección base + offset
+
+    def index_load(self):
+        self._emit("IDX_LOAD") # Cargar valor desde base + offset
+
+    # --- Funciones ---
+    def function_label(self, name): 
+        print(f"\nPROC {name}:")
+
+    def return_val(self): 
+        self._emit("RET")
+
+    def call_function(self, name): 
+        self._emit("CALL", name)
+
+    def push_param(self, param_name):
+        self._emit("PARAM", param_name)

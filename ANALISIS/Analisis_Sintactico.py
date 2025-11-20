@@ -1,4 +1,4 @@
-# Analisis_Sintactico.py
+# ANALISIS/Analisis_Sintactico.py
 
 from ANALISIS.Analisis_Lexico import Lexico, Automata
 from ANALISIS.GeneraCodigo import GeneraCodigo
@@ -6,7 +6,8 @@ from ANALISIS.Analisis_Semantico import TablaSimbolos, SemanticError
 
 class Sintactico:
     """
-    Analizador Sintáctico para una sintaxis de C++.
+    Analizador Sintáctico Descendente Recursivo para C++.
+    Genera trazas de depuración estructuradas y coordina la generación de código.
     """
     def __init__(self, fuente, salida=None, traza=False):
         self.lexico = Lexico(fuente, traza)
@@ -17,76 +18,71 @@ class Sintactico:
         self.traza = traza
         self.loop_exit_stack = []
         
-        print("INICIO DE ANALISIS SINTACTICO Y SEMANTICO")
+        print(f"{'='*40}")
+        print(f"{'INICIO DE COMPILACIÓN':^40}")
+        print(f"{'='*40}")
+
         try: 
+            self.generaCodigo.code() 
             self.programa()
-            print("FIN DE ANALISIS SINTACTICO Y SEMANTICO")
+            self.generaCodigo.end()  
+            
+            print(f"\n{'='*40}")
+            print(f"{'COMPILACIÓN EXITOSA':^40}")
+            print(f"{'='*40}")
+
+
         except (SyntaxError, SemanticError) as e:
-            print(f"ANÁLISIS FALLIDO: {e}")
+            print(f"ERROR  DETECTADO")
+            print(f"{e}")
         except Exception as e:
-             print(f"ERROR INESPERADO: {e}")
+             print(f"ERROR INTERNO DEL COMPILADOR: {e}")
 
+    # --- HELPER PARA LOGS ---
+    def _log(self, regla):
+        """Estandariza la salida de las reglas sintácticas."""
+        if self.traza:
+            # Formato: [PARSER] <NombreRegla>
+            print(f"[PARSER] <{regla}>")
 
-#--------ERRORES SINTACTICO Y SEMANTICO--------
+    # --- GESTIÓN DE ERRORES ---
     def errores(self, codigo_error):
         errores_msg = {
-            1: ": SE ESPERABA 'int'", 2: ": SE ESPERABA 'main'", 3: ": SE ESPERABA '('",
-            4: ": SE ESPERABA ')'", 5: ": SE ESPERABA '{'", 6: ": SE ESPERABA '}'",
-            7: ": SE ESPERABA ';'", 8: ": SE ESPERABA UN IDENTIFICADOR (VARIABLE)",
-            9: ": SENTENCIA NO RECONOCIDA", 10: ": SE ESPERABA UN OPERADOR RELACIONAL (==, !=, <, >,...)",
-            11: ": SE ESPERABA 'case' o 'default'", 12: ": SE ESPERABA ':'",
-            13: ": SE ESPERABA '<<' o '>>'", 14: ": SE ESPERABA '='",
-            15: ": SE ESPERABA UNA CONSTANTE NUMERICA", 16: ": SE ESPERABA UN CARACTER LITERAL (ej: 'A')",
-            17: ": SE ESPERABA UNA CONSTANTE (NUMERO o CHAR) PARA EL CASE.",
-            18: ": 'break' FUERA DE LUGAR (NO ESTA DENTRO DE UN BUCLE O SWITCH)",
-            19: ": SE ESPERABA '++' o '--'", 20: ": SE ESPERABA UN OPERADOR DE ASIGNACION (=, ++, --)"
+            1: "Se esperaba 'int'", 2: "Se esperaba 'main'", 3: "Se esperaba '('",
+            4: "Se esperaba ')'", 5: "Se esperaba '{'", 6: "Se esperaba '}'",
+            7: "Se esperaba ';'", 8: "Identificador esperado",
+            9: "Sentencia no válida en este contexto", 10: "Operador relacional esperado",
+            11: "Se esperaba 'case' o 'default'", 12: "Se esperaba ':'",
+            13: "Se esperaba operador I/O ('<<' o '>>')", 14: "Se esperaba '='",
+            15: "Constante numérica esperada", 16: "Carácter literal esperado",
+            17: "Constante válida para case esperada",
+            18: "'break' huérfano (fuera de bucle/switch)",
+            19: "Operador de incremento/decremento esperado", 20: "Asignación mal formada"
         }
-        mensaje = f"LINEA {self.lexico.lineaActual()} ERROR SINTACTICO {codigo_error}{errores_msg.get(codigo_error, ': ERROR DESCONOCIDO')}"
+        mensaje = f"Línea {self.lexico.lineaActual()} | Error Sintáctico {codigo_error}: {errores_msg.get(codigo_error, 'Desconocido')}"
         raise SyntaxError(mensaje)
 
     def error_semantico(self, mensaje):
         raise SemanticError(mensaje, self.lexico.lineaActual())
-    
-    def validar_tipo_condicion(self, tipo):
-        if tipo not in ['int', 'char']:
-            self.error_semantico(f"La condición debe ser de tipo 'int' o 'char', pero se encontró '{tipo}'.")
-    
-    def validar_asignacion(self, tipo_variable, tipo_expresion):
-        if tipo_variable != tipo_expresion:
-            self.error_semantico(f"No se puede asignar un valor de tipo '{tipo_expresion}' a una variable de tipo '{tipo_variable}'.")
-    
-    def validar_op_binaria(self, tipo1, op, tipo2):
-        if tipo1 != 'int' or tipo2 != 'int':
-            self.error_semantico(f"Operador '{op}' no es válido entre los tipos '{tipo1}' y '{tipo2}'. Solo se permiten operaciones con 'int'.")
-        return 'int' 
-
-    def validar_op_relacional(self, tipo1, op, tipo2):
-        if tipo1 != tipo2:
-            self.error_semantico(f"Operador relacional '{op}' no es válido entre los tipos '{tipo1}' y '{tipo2}'.")
-        return 'int' 
 
     def parea(self, token_esperado):
         if self.token == token_esperado:
             self.token = self.lexico.siguienteToken()
         else:
-            if token_esperado == 'int': self.errores(1)
-            elif token_esperado == 'main': self.errores(2)
-            elif token_esperado == '(': self.errores(3)
-            elif token_esperado == ')': self.errores(4)
-            elif token_esperado == '{': self.errores(5)
-            elif token_esperado == '}': self.errores(6)
-            elif token_esperado == ';': self.errores(7)
-            elif token_esperado in ['case', 'default']: self.errores(11)
-            elif token_esperado == ':': self.errores(12)
-            elif token_esperado in ['<<', '>>']: self.errores(13)
-            elif token_esperado == '=': self.errores(14)
-            elif token_esperado in ['++', '--']: self.errores(19)
+            # Mapeo rápido de códigos de error comunes
+            mapa_errores = {
+                'int': 1, 'main': 2, '(': 3, ')': 4, '{': 5, '}': 6, ';': 7,
+                ':': 12, '<<': 13, '>>': 13, '=': 14
+            }
+            if token_esperado in mapa_errores:
+                self.errores(mapa_errores[token_esperado])
             else:
-                mensaje = f"LINEA {self.lexico.lineaActual()} ERROR SINTACTICO: Se esperaba '{token_esperado}' pero se encontró '{self.token}'"
-                raise SyntaxError(mensaje)
+                raise SyntaxError(f"Línea {self.lexico.lineaActual()} | Se esperaba '{token_esperado}', se encontró '{self.token}'")
+
+    # --- REGLAS DE LA GRAMÁTICA ---
 
     def programa(self):
-        if self.traza: print("ANALISIS SINTACTICO: <PROGRAMA>")
+        self._log("PROGRAMA")
         self.token = self.lexico.siguienteToken()
         while self.token != 'EOF':
             if self.token == 'class': 
@@ -94,19 +90,16 @@ class Sintactico:
             elif self.token in ['int', 'char', 'void', 'float', 'double']:
                 self.definicion_funcion()
             else:
-                print(f"Error fatal en linea {self.lexico.lineaActual()}. Token inesperado: {self.token}")
                 self.errores(9) 
-        self.generaCodigo.end()
         
     def definicion_funcion(self):
-        if self.traza: print("ANALISIS SINTACTICO: <DEF_FUNCION>")
+        self._log("DEF_FUNCION")
         
         tipo_retorno = self.token
         self.token = self.lexico.siguienteToken() 
         
         nombre_func = self.token
-        if not self.automata.es_valido(nombre_func):
-            self.errores(8) 
+        if not self.automata.es_valido(nombre_func): self.errores(8) 
         self.token = self.lexico.siguienteToken()
 
         self.parea('(')
@@ -117,8 +110,7 @@ class Sintactico:
         if self.token != ')':
             while True:
                 tipo_param = self.token
-                if tipo_param not in ['int', 'char', 'float', 'double']:
-                     self.errores(1)
+                if tipo_param not in ['int', 'char', 'float', 'double']: self.errores(1)
                 self.token = self.lexico.siguienteToken()
                 
                 nombre_param = self.token
@@ -127,10 +119,8 @@ class Sintactico:
                 parametros.append((nombre_param, tipo_param))
                 tipos_params.append(tipo_param)
                 
-                if self.token == ',':
-                    self.parea(',')
-                else:
-                    break
+                if self.token == ',': self.parea(',')
+                else: break
         
         self.parea(')')
 
@@ -149,7 +139,7 @@ class Sintactico:
             self.parea('return')
             tipo_expr = self.expresion()
             if tipo_expr != tipo_retorno:
-                self.error_semantico(f"Tipo de retorno incorrecto en '{nombre_func}'. Esperaba {tipo_retorno}, obtuvo {tipo_expr}")
+                self.error_semantico(f"Retorno inválido en '{nombre_func}'. Esperaba {tipo_retorno}, obtuvo {tipo_expr}")
             self.parea(';')
             self.generaCodigo.return_val()
 
@@ -157,7 +147,7 @@ class Sintactico:
         self.parea('}')
         
     def llamada_funcion(self, nombre_func):
-        if self.traza: print("ANALISIS SINTACTICO: <LLAMADA_FUNCION>")
+        self._log("LLAMADA_FUNCION")
         
         info_func = self.tabla_simbolos.buscar_funcion(nombre_func, self.lexico.lineaActual())
         tipos_params_esperados = info_func['params']
@@ -168,65 +158,44 @@ class Sintactico:
         if self.token != ')':
             while True:
                 if argumentos_encontrados >= len(tipos_params_esperados):
-                    self.error_semantico(f"Demasiados argumentos para la función '{nombre_func}'.")
+                    self.error_semantico(f"Exceso de argumentos para '{nombre_func}'.")
                 
                 tipo_arg = self.expresion()
                 tipo_esperado = tipos_params_esperados[argumentos_encontrados]
                 
                 if tipo_arg != tipo_esperado:
-                    self.error_semantico(f"Argumento {argumentos_encontrados+1} de '{nombre_func}' no coincide. Esperaba {tipo_esperado}, recibió {tipo_arg}")
+                    self.error_semantico(f"Tipo de argumento {argumentos_encontrados+1} incorrecto. Esperaba {tipo_esperado}.")
                 
                 self.generaCodigo.push_param(f"arg_{argumentos_encontrados}")
-                
                 argumentos_encontrados += 1
                 
-                if self.token == ',':
-                    self.parea(',')
-                else:
-                    break
+                if self.token == ',': self.parea(',')
+                else: break
         
         if argumentos_encontrados < len(tipos_params_esperados):
-             self.error_semantico(f"Faltan argumentos para la función '{nombre_func}'.")
+             self.error_semantico(f"Argumentos insuficientes para '{nombre_func}'.")
 
         self.parea(')')
         self.generaCodigo.call_function(nombre_func)
-        
         return info_func['tipo'] 
 
     def bloque(self):
-        if self.traza: print("ANALISIS SINTACTICO: <BLOQUE>")
-        while self.token != '}' and self.token != 'EOF' and self.token != 'return':
+        self._log("BLOQUE")
+        while self.token not in ['}', 'EOF', 'return']:
             self.sentencia()
 
     def sentencia(self):
-        if self.traza: print("ANALISIS SINTACTICO: <SENTENCIA>")
-        if self.token == 'if':
-            self.sentencia_if()
-        elif self.token == 'switch':
-            self.sentencia_switch()
-        elif self.token == 'cin':
-            self.sentencia_cin()
-        elif self.token == 'cout':
-            self.sentencia_cout()
-        elif self.token in ['int', 'char', 'float', 'double']: 
-            self.declaracion()
-        elif self.token == 'while':
-            self.sentencia_while()
-        elif self.token == 'do':
-            self.sentencia_do_while()
-        elif self.token == 'for':
-            self.sentencia_for()
-        elif self.token == 'break':
-            self.sentencia_break()
-            
-        elif self.tabla_simbolos.es_clase(self.token):
-            self.declaracion_objeto()
-            
-        
-            
-        elif self.automata.es_valido(self.token):
-            self.asignacion()
-            
+        self._log("SENTENCIA") # reducir ruido <-------------------
+        if self.token == 'if': self.sentencia_if()
+        elif self.token == 'switch': self.sentencia_switch()
+        elif self.token == 'cin': self.sentencia_cin()
+        elif self.token == 'cout': self.sentencia_cout()
+        elif self.token in ['int', 'char', 'float', 'double']: self.declaracion()
+        elif self.token == 'while': self.sentencia_while()
+        elif self.token == 'do': self.sentencia_do_while()
+        elif self.token == 'for': self.sentencia_for()
+        elif self.token == 'break': self.sentencia_break()
+        elif self.tabla_simbolos.es_clase(self.token): self.declaracion_objeto()
         elif self.automata.es_valido(self.token):
             nombre = self.token
             siguiente = self.lexico.siguienteToken() 
@@ -242,21 +211,17 @@ class Sintactico:
             self.errores(9)
 
     def sentencia_break(self):
-        if self.traza: print("ANALISIS SINTACTICO: <BREAK>")
+        self._log("BREAK")
         self.parea('break')
-        if not self.loop_exit_stack:
-            self.errores(18) 
+        if not self.loop_exit_stack: self.errores(18) 
         else:
-            exit_label = self.loop_exit_stack[-1] 
-            self.generaCodigo.jump(exit_label)
+            self.generaCodigo.jump(self.loop_exit_stack[-1])
         self.parea(';')
 
     def declaracion(self):
-        if self.traza: print("ANALISIS SINTACTICO: <DECLARACION>")
-
+        self._log("DECLARACION")
         tipo_token = self.token 
-        if tipo_token in ['int', 'char', 'float', 'double']:
-            self.parea(tipo_token)
+        if tipo_token in ['int', 'char', 'float', 'double']: self.parea(tipo_token)
 
         nombre_variable = self.token
         self.tabla_simbolos.declarar(nombre_variable, tipo_token, self.lexico.lineaActual())
@@ -264,27 +229,19 @@ class Sintactico:
 
         if self.token == '[':
             self.parea('[')
-            tipo_expr_tamano = self.expresion() 
-            if tipo_expr_tamano != 'int':
-                self.error_semantico(f"El tamaño del arreglo debe ser una expresión de tipo 'int', pero se encontró '{tipo_expr_tamano}'.")
+            if self.expresion() != 'int':
+                self.error_semantico("Tamaño de arreglo debe ser entero.")
             self.parea(']')
-        
         elif self.token == '=':
             self.parea('=')
-            tipo_expresion = ''
-            if tipo_token == 'int':
-                tipo_expresion = self.expresion() 
-            elif tipo_token == 'char':
-                tipo_expresion = self.valor_char()
-            
-            self.validar_asignacion(tipo_token, tipo_expresion) 
+            tipo_expr = self.expresion() if tipo_token == 'int' else self.valor_char()
+            self.validar_asignacion(tipo_token, tipo_expr) 
             self.generaCodigo.store()
         self.parea(';')
     
     def valor_char(self):
-        if self.traza: 
-            print("ANALISIS SINTACTICO: <VALOR_CHAR>")
-        if len(self.token) == 3 and self.token.startswith("'") and self.token.endswith("'"):
+        self._log("VALOR_CHAR")
+        if len(self.token) == 3 and self.token.startswith("'"):
             self.generaCodigo.push_char(self.token) 
             self.token = self.lexico.siguienteToken()
             return 'char' 
@@ -292,18 +249,12 @@ class Sintactico:
             self.errores(16)
     
     def constante_o_char(self):
-        if self.traza: print("ANALISIS SINTACTICO: <CONSTANTE_O_CHAR>")
-        
-        if self.token.isdigit():
-            return self.constante()
-        elif len(self.token) == 3 and self.token.startswith("'") and self.token.endswith("'"):
-            return self.valor_char() 
-        else:
-            self.errores(17) 
+        if self.token.isdigit(): return self.constante()
+        elif len(self.token) == 3 and self.token.startswith("'"): return self.valor_char() 
+        else: self.errores(17) 
     
     def asignacion(self):
-        if self.traza: print("ANALISIS SINTACTICO: <ASIGNACION>")
-        
+        self._log("ASIGNACION")
         tipo_variable = self.variable() 
         
         if self.token == '=':
@@ -312,16 +263,13 @@ class Sintactico:
             self.validar_asignacion(tipo_variable, tipo_expresion) 
             self.parea(';')
             self.generaCodigo.store()
-        
         elif self.token in ['++', '--']:
-            if tipo_variable != 'int':
-                self.error_semantico(f"Operador '{self.token}' solo se puede aplicar a variables 'int'.")
+            if tipo_variable != 'int': self.error_semantico("Incremento solo para int.")
             op = self.token
             self.parea(op)
             if op == '++': self.generaCodigo.post_inc()
             else: self.generaCodigo.post_dec()
             self.parea(';')
-        
         elif self.token == '[':
             self.parea('[')
             self.expresion()
@@ -331,32 +279,29 @@ class Sintactico:
             self.expresion()
             self.parea(';')
             self.generaCodigo.store()
-        
         else:
             self.errores(20)
 
     def sentencia_if(self):
-        if self.traza: print("ANALISIS SINTACTICO: <SENTENCIA_IF>")
+        self._log("IF")
         self.parea('if')
         self.parea('(')
-        
-        tipo_condicion = self.condicion() 
-        self.validar_tipo_condicion(tipo_condicion) 
-
+        self.validar_tipo_condicion(self.condicion()) 
         self.parea(')')
 
-        etiqueta_else = self.generaCodigo.nueva_etiqueta()
-        etiqueta_fin = self.generaCodigo.nueva_etiqueta()
-        self.generaCodigo.jump_false(etiqueta_else)
+        l_else = self.generaCodigo.nueva_etiqueta()
+        l_fin = self.generaCodigo.nueva_etiqueta()
+        self.generaCodigo.jump_false(l_else)
 
         self.parea('{')
         self.tabla_simbolos.entrar_ambito() 
         self.bloque()
         self.tabla_simbolos.salir_ambito() 
         self.parea('}')
-        self.generaCodigo.jump(etiqueta_fin)
         
-        self.generaCodigo.label(etiqueta_else)
+        self.generaCodigo.jump(l_fin)
+        self.generaCodigo.label(l_else)
+        
         if self.token == 'else':
             self.parea('else')
             self.parea('{')
@@ -365,217 +310,179 @@ class Sintactico:
             self.tabla_simbolos.salir_ambito() 
             self.parea('}')
         
-        self.generaCodigo.label(etiqueta_fin)
+        self.generaCodigo.label(l_fin)
 
     def condicion(self):
-        if self.traza: print("ANALISIS SINTACTICO: <CONDICION>")
+        self._log("CONDICION")
         tipo1 = self.expresion()
         op = self.token
         if op in ['==', '!=', '<', '>', '<=', '>=']:
             self.parea(op)
             tipo2 = self.expresion()
-            tipo_resultado = self.validar_op_relacional(tipo1, op, tipo2) 
+            self.validar_op_relacional(tipo1, op, tipo2) 
             
-            ops = {'==': 'cmp_equal', '!=': 'cmp_notequal', '<': 'cmp_less', '>': 'cmp_greater', '<=': 'cmp_lessequal', '>=': 'cmp_greaterequal'}
+            ops = {'==':'cmp_equal', '!=':'cmp_notequal', '<':'cmp_less', '>':'cmp_greater', '<=':'cmp_lessequal', '>=':'cmp_greaterequal'}
             getattr(self.generaCodigo, ops[op])()
-            return tipo_resultado 
-        else:
-            return tipo1 
+            return 'int' 
+        return tipo1 
 
     def sentencia_switch(self):
-        if self.traza: print("ANALISIS SINTACTICO: <SENTENCIA_SWITCH>")
+        self._log("SWITCH")
+        l_fin = self.generaCodigo.nueva_etiqueta()
+        self.loop_exit_stack.append(l_fin)
         
-        etiqueta_fin = self.generaCodigo.nueva_etiqueta()
-        self.loop_exit_stack.append(etiqueta_fin)
         self.parea('switch')
         self.parea('(')
-        
         tipo_expr = self.expresion() 
-        if tipo_expr not in ['int', 'char']:
-            self.error_semantico(f"La expresión del 'switch' debe ser 'int' o 'char', se encontró '{tipo_expr}'.")
-            
+        if tipo_expr not in ['int', 'char']: self.error_semantico("Switch requiere int o char.")
         self.parea(')')
+        
         self.generaCodigo.switch_begin()
         self.parea('{')
         self.tabla_simbolos.entrar_ambito() 
         
-        while self.token == 'case':
-            self.caso(tipo_expr) 
-        if self.token == 'default':
-            self.caso_default()
+        while self.token == 'case': self.caso(tipo_expr) 
+        if self.token == 'default': self.caso_default()
             
         self.tabla_simbolos.salir_ambito() 
         self.parea('}')
-        self.generaCodigo.label(etiqueta_fin) 
+        self.generaCodigo.label(l_fin) 
         self.loop_exit_stack.pop() 
         self.generaCodigo.switch_end()
         
     def bloque_case(self):
-        if self.traza: print("ANALISIS SINTACTICO: <BLOQUE_CASE>")
-        while (self.token != 'break' and 
-               self.token != 'case' and 
-               self.token != 'default' and 
-               self.token != '}'):
-            
-            if self.token == 'EOF':
-                self.errores(6) 
-                break
-                
+        while self.token not in ['break', 'case', 'default', '}', 'EOF']:
             self.sentencia()
-        
-        if self.token == 'break':
-            self.sentencia_break()
+        if self.token == 'break': self.sentencia_break()
     
     def caso(self, tipo_switch):
-        if self.traza: print("ANALISIS SINTACTICO: <CASO>")
+        self._log("CASE")
         self.parea('case')
-        valor_case = self.token 
+        valor = self.token 
         tipo_case = self.constante_o_char() 
-        
-        if tipo_case != tipo_switch:    
-             self.error_semantico(f"El tipo del 'case' ({tipo_case}) no coincide con el tipo del 'switch' ({tipo_switch}).")
-             
+        if tipo_case != tipo_switch: self.error_semantico("Tipo mismatch en case.")
         self.parea(':')
-        self.generaCodigo.case_begin(valor_case)
+        self.generaCodigo.case_begin(valor)
         self.bloque_case() 
 
     def caso_default(self):
-        if self.traza: print("ANALISIS SINTACTICO: <DEFAULT>")
+        self._log("DEFAULT")
         self.parea('default')
         self.parea(':')
         self.bloque_case()
 
     def sentencia_cin(self):
-        if self.traza: print("ANALISIS SINTACTICO: <CIN>")
+        self._log("CIN")
         self.parea('cin')
         while self.token == '>>':
             self.parea('>>')
-            nombre_variable = self.token
+            var = self.token
             self.variable() 
             if self.token == '[':
                 self.parea('[')
                 self.expresion() 
                 self.parea(']')
                 self.generaCodigo.index_address()
-            self.generaCodigo.input(nombre_variable)
+            self.generaCodigo.input(var)
         self.parea(';')
         
     def sentencia_cout(self):
-        if self.traza: print("ANALISIS SINTACTICO: <COUT>")
+        self._log("COUT")
         self.parea('cout')
-        
         while self.token == '<<':
             self.parea('<<')
             self.expresion() 
             self.generaCodigo.out()
-    
         self.parea(';')
 
     def variable(self):
-        if self.traza: print("ANALISIS SINTACTICO: <VARIABLE>")
+        # self._log("VARIABLE")
         if self.automata.es_valido(self.token):
-            nombre_var = self.token
-            tipo_var = self.tabla_simbolos.buscar(nombre_var, self.lexico.lineaActual())
-            self.generaCodigo.pusha(nombre_var)
+            nombre = self.token
+            tipo = self.tabla_simbolos.buscar(nombre, self.lexico.lineaActual())
+            self.generaCodigo.pusha(nombre)
             self.token = self.lexico.siguienteToken()
             
             if self.token == '.':
-                if not self.tabla_simbolos.es_clase(tipo_var):
-                    self.error_semantico(f"La variable '{nombre_var}' no es un objeto.")
-
+                if not self.tabla_simbolos.es_clase(tipo): self.error_semantico(f"'{nombre}' no es objeto.")
                 self.parea('.')
-                nombre_miembro = self.token
+                miembro = self.token
                 
-                if self.tabla_simbolos.existe_atributo(tipo_var, nombre_miembro):
-                    tipo = self.tabla_simbolos.obtener_tipo_atributo(tipo_var, nombre_miembro, self.lexico.lineaActual())
-                    print(f"Acceso a atributo: {tipo_var}.{nombre_miembro}")
+                if self.tabla_simbolos.existe_atributo(tipo, miembro):
+                    tipo_atr = self.tabla_simbolos.obtener_tipo_atributo(tipo, miembro, self.lexico.lineaActual())
+                    if self.traza: print(f"[SEMANTICO] Acceso atributo: {tipo}.{miembro}")
                     self.token = self.lexico.siguienteToken()
-                    return tipo
+                    return tipo_atr
                 
-                metodo_info = self.tabla_simbolos.buscar_metodo_clase(tipo_var, nombre_miembro, self.lexico.lineaActual())
-                if metodo_info:
-                    print(f"Llamada a método: {tipo_var}.{nombre_miembro}")
+                metodo = self.tabla_simbolos.buscar_metodo_clase(tipo, miembro, self.lexico.lineaActual())
+                if metodo:
+                    if self.traza: print(f"[SEMANTICO] Llamada método: {tipo}.{miembro}")
                     self.token = self.lexico.siguienteToken() 
-                    return self.llamada_metodo_objeto(metodo_info, nombre_miembro)
-                self.error_semantico(f"La clase '{tipo_var}' no tiene el miembro '{nombre_miembro}'.")
+                    return self.llamada_metodo_objeto(metodo, miembro)
+                
+                self.error_semantico(f"Miembro '{miembro}' no existe en '{tipo}'.")
 
-            return tipo_var 
+            return tipo 
         else:
             self.errores(8)
             
     def expresion(self):
-        if self.traza: print("ANALISIS SINTACTICO: <EXPRESION>")
-        tipo1 = self.termino()
-        return self.mas_terminos(tipo1) 
+        tipo = self.termino()
+        return self.mas_terminos(tipo) 
 
     def mas_terminos(self, tipo_izq):
         if self.token in ['+', '-']:
             op = self.token
             self.parea(op)
             tipo_der = self.termino()
-            
             tipo_res = self.validar_op_binaria(tipo_izq, op, tipo_der)
             
             if op == '+': self.generaCodigo.add()
-            else:
-                self.generaCodigo.neg(); self.generaCodigo.add()
-            
+            else: self.generaCodigo.neg(); self.generaCodigo.add()
             return self.mas_terminos(tipo_res) 
-        else:
-            return tipo_izq
+        return tipo_izq
 
     def termino(self):
-        if self.traza: print("ANALISIS SINTACTICO: <TERMINO>")
-        tipo1 = self.factor()
-        return self.mas_factores(tipo1) 
+        tipo = self.factor()
+        return self.mas_factores(tipo) 
 
     def mas_factores(self, tipo_izq):
         if self.token in ['*', '/', '%']:
             op = self.token
             self.parea(op)
             tipo_der = self.factor()
-            
             tipo_res = self.validar_op_binaria(tipo_izq, op, tipo_der)
             
             if op == '*': self.generaCodigo.mul()
             elif op == '/': self.generaCodigo.div()
             else: self.generaCodigo.mod()
-            
             return self.mas_factores(tipo_res) 
-        else:
-            return tipo_izq 
+        return tipo_izq 
 
     def factor(self):
-        if self.traza: print("ANALISIS SINTACTICO: <FACTOR>")
-        if self.token.startswith('"') and self.token.endswith('"'):
+        if self.token.startswith('"'):
             self.generaCodigo.push_string(self.token) 
             self.token = self.lexico.siguienteToken()
             return 'string' 
-            
-        elif len(self.token) == 3 and self.token.startswith("'") and self.token.endswith("'"):
+        elif len(self.token) == 3 and self.token.startswith("'"):
             return self.valor_char() 
-            
         elif self.token == '(':
             self.parea('(')
-            tipo_expr = self.expresion()
+            tipo = self.expresion()
             self.parea(')')
-            return tipo_expr 
+            return tipo 
         elif self.token.isdigit():
             return self.constante()
         elif self.automata.es_valido(self.token):
             nombre = self.token
-            
-            siguiente = self.lexico.siguienteToken()
-            
-            if siguiente == '(':
-                self.token = siguiente 
+            sig = self.lexico.siguienteToken()
+            if sig == '(':
+                self.token = sig 
                 return self.llamada_funcion(nombre)
-            
             else:
                 self.lexico.devuelveToken() 
                 self.token = nombre 
-                tipo_var = self.variable()
-                
+                tipo = self.variable()
                 if self.token == '[':
                     self.parea('[')
                     self.expresion() 
@@ -583,104 +490,56 @@ class Sintactico:
                     self.generaCodigo.index_load() 
                 else:
                     self.generaCodigo.load()       
-                
-                return tipo_var 
-                
+                return tipo 
         else:
             self.errores(8)
 
     def constante(self):
-        if self.traza: print("ANALISIS SINTACTICO: <CONSTANTE>")
         if self.token.isdigit():
             self.generaCodigo.pushc(self.token)
             self.token = self.lexico.siguienteToken()
             return 'int' 
-        else:
-            self.errores(15) 
+        self.errores(15) 
     
     def expresion_incremento(self):
-        if self.traza: print("ANALISIS SINTACTICO: <EXPRESION_INCREMENTO>")
-        
+        self._log("EXPR_INCREMENTO")
         if self.token in ['++', '--']:
             op = self.token
             self.parea(op) 
-            
-            if not self.automata.es_valido(self.token): self.errores(8)
-            
-            tipo_var = self.variable() 
-            if tipo_var != 'int': 
-                 self.error_semantico(f"Operador pre-fijo '{op}' solo válido para 'int'.")
-            
+            tipo = self.variable() 
+            if tipo != 'int': self.error_semantico("Pre-inc solo int.")
             if op == '++': self.generaCodigo.pre_inc()
             else: self.generaCodigo.pre_dec()
         
         elif self.automata.es_valido(self.token):
-            tipo_var = self.variable() 
-            
+            tipo = self.variable() 
             if self.token == '=':
                 self.parea('=')
-                tipo_expr = self.expresion()
-                self.validar_asignacion(tipo_var, tipo_expr) 
+                tipo_ex = self.expresion()
+                self.validar_asignacion(tipo, tipo_ex) 
                 self.generaCodigo.store()
             elif self.token in ['++', '--']:
                 op = self.token
-                if tipo_var != 'int': 
-                    self.error_semantico(f"Operador post-fijo '{op}' solo válido para 'int'.")
+                if tipo != 'int': self.error_semantico("Post-inc solo int.")
                 self.parea(op)
                 if op == '++': self.generaCodigo.post_inc()
                 else: self.generaCodigo.post_dec()
             else:
                 self.errores(20)
-        
-        elif self.token == ')':
-            pass 
-        else:
-            self.errores(9) 
     
-    def declaracion_simple(self):
-        if self.traza: print("ANALISIS SINTACTICO: <DECLARACION_SIMPLE>")
-        
-        tipo_token = self.token
-        if tipo_token == 'int': self.parea('int')
-        elif tipo_token == 'char': self.parea('char')
-        
-        nombre_variable = self.token
-        self.tabla_simbolos.declarar(nombre_variable, tipo_token, self.lexico.lineaActual())
-        self.variable() 
-        
-        if self.token == '=':
-            self.parea('=')
-            tipo_expresion = ''
-            if tipo_token == 'int':
-                tipo_expresion = self.expresion()
-            elif tipo_token == 'char':
-                tipo_expresion = self.valor_char()
-            
-            self.validar_asignacion(tipo_token, tipo_expresion) 
-            self.generaCodigo.store()
-            
     def sentencia_while(self):
-        """
-        Analiza la gramática: while ( <condicion> ) { <bloque> }
-        """
-        if self.traza: print("ANALISIS SINTACTICO: <SENTENCIA_WHILE>")
+        self._log("WHILE")
+        l_ini = self.generaCodigo.nueva_etiqueta()
+        l_fin = self.generaCodigo.nueva_etiqueta()
+        self.loop_exit_stack.append(l_fin)
         
-        etiqueta_inicio = self.generaCodigo.nueva_etiqueta()
-        etiqueta_fin = self.generaCodigo.nueva_etiqueta()
-
-        self.loop_exit_stack.append(etiqueta_fin)
-        
-        self.generaCodigo.label(etiqueta_inicio) 
-        
+        self.generaCodigo.label(l_ini) 
         self.parea('while')
         self.parea('(')
-        
-        tipo_cond = self.condicion() 
-        self.validar_tipo_condicion(tipo_cond) 
-                                         
+        self.validar_tipo_condicion(self.condicion()) 
         self.parea(')')
         
-        self.generaCodigo.jump_false(etiqueta_fin) 
+        self.generaCodigo.jump_false(l_fin) 
         
         self.parea('{')
         self.tabla_simbolos.entrar_ambito()     
@@ -688,27 +547,20 @@ class Sintactico:
         self.tabla_simbolos.salir_ambito() 
         self.parea('}')
         
-        self.generaCodigo.jump(etiqueta_inicio)   
-        
-        self.generaCodigo.label(etiqueta_fin)     
+        self.generaCodigo.jump(l_ini)   
+        self.generaCodigo.label(l_fin)     
         self.loop_exit_stack.pop()                
 
-
     def sentencia_do_while(self):
-        """
-        Analiza la gramática: do { <bloque> } while ( <condicion> ) ;
-        """
-        if self.traza: print("ANALISIS SINTACTICO: <SENTENCIA_DO_WHILE>")
-        
-        etiqueta_inicio = self.generaCodigo.nueva_etiqueta()
-        etiqueta_fin = self.generaCodigo.nueva_etiqueta()
-
-        self.loop_exit_stack.append(etiqueta_fin)
+        self._log("DO_WHILE")
+        l_ini = self.generaCodigo.nueva_etiqueta()
+        l_fin = self.generaCodigo.nueva_etiqueta()
+        self.loop_exit_stack.append(l_fin)
         
         self.parea('do')
         self.parea('{')
         
-        self.generaCodigo.label(etiqueta_inicio) 
+        self.generaCodigo.label(l_ini) 
         self.tabla_simbolos.entrar_ambito()
         self.bloque()                         
         self.tabla_simbolos.salir_ambito() 
@@ -716,120 +568,93 @@ class Sintactico:
         self.parea('}')
         self.parea('while')
         self.parea('(')
-        
-        tipo_cond = self.condicion() 
-        self.validar_tipo_condicion(tipo_cond) 
-                             
+        self.validar_tipo_condicion(self.condicion()) 
         self.parea(')')
         self.parea(';')
         
-        self.generaCodigo.jump_true(etiqueta_inicio) 
-        
-        self.generaCodigo.label(etiqueta_fin)     
+        self.generaCodigo.jump_true(l_ini) 
+        self.generaCodigo.label(l_fin)     
         self.loop_exit_stack.pop()                
 
-
-    def asignacion_simple(self):
-        """
-        Helper para 'for': Analiza una asignación SIN el punto y coma.
-        """
-        if self.traza: print("ANALISIS SINTACTICO: <ASIGNACION_SIMPLE>")
-        if self.automata.es_valido(self.token):
-            tipo_variable = self.variable() 
-            self.parea('=')
-            tipo_expresion = self.expresion()
-            self.validar_asignacion(tipo_variable, tipo_expresion) 
-            self.generaCodigo.store()
-        else:
-            pass 
-
-
     def sentencia_for(self):
-        """
-        Analiza la gramática: for ( [asig] ; [cond] ; [inc] ) { <bloque> }
-        """
-        if self.traza: print("ANALISIS SINTACTICO: <SENTENCIA_FOR>")
-        
-        etiqueta_cond = self.generaCodigo.nueva_etiqueta()
-        etiqueta_inc = self.generaCodigo.nueva_etiqueta()
-        etiqueta_fin = self.generaCodigo.nueva_etiqueta()
-
-        self.loop_exit_stack.append(etiqueta_fin)
+        self._log("FOR")
+        l_cond = self.generaCodigo.nueva_etiqueta()
+        l_inc = self.generaCodigo.nueva_etiqueta()
+        l_fin = self.generaCodigo.nueva_etiqueta()
+        self.loop_exit_stack.append(l_fin)
         
         self.parea('for')
         self.parea('(')
-        
         self.tabla_simbolos.entrar_ambito()
         
-        # --- 1. Inicializador ---
+        # 1. Init
         if self.token != ';':
-            if self.token == 'int' or self.token == 'char':
-                self.declaracion_simple() 
-            elif self.automata.es_valido(self.token):
-                self.asignacion_simple() 
-            else:
-                pass
-        
+            if self.token in ['int', 'char']: self.declaracion_simple() 
+            else: self.asignacion_simple() 
         self.parea(';')
         
-        # --- 2. Condición ---
-        self.generaCodigo.label(etiqueta_cond)
+        # 2. Cond
+        self.generaCodigo.label(l_cond)
         if self.token != ';':
-            tipo_cond = self.condicion()
-            self.validar_tipo_condicion(tipo_cond) 
-            self.generaCodigo.jump_false(etiqueta_fin) 
+            self.validar_tipo_condicion(self.condicion()) 
+            self.generaCodigo.jump_false(l_fin) 
         self.parea(';')
         
-        # --- 3. Incremento ---
-        indice_incremento = self.lexico.idx_token_actual
-        
-        while self.token != ')' and self.token != 'EOF':
-            self.token = self.lexico.siguienteToken()
-        if self.token == 'EOF': self.errores(4) 
-        
+        # 3. Inc (Parseo diferido)
+        idx_inc = self.lexico.idx_token_actual
+        while self.token not in [')', 'EOF']: self.token = self.lexico.siguienteToken()
         self.parea(')') 
         
-        # --- 4. Bloque ---
+        # 4. Bloque
         self.parea('{')
         self.bloque()
         self.parea('}')
         
-        # --- 5. Ejecutar Incremento ---
-        self.generaCodigo.label(etiqueta_inc)
-        
-        indice_actual = self.lexico.idx_token_actual 
-        
-        self.lexico.idx_token_actual = indice_incremento - 1
+        # 5. Exec Inc
+        self.generaCodigo.label(l_inc)
+        idx_actual = self.lexico.idx_token_actual 
+        self.lexico.idx_token_actual = idx_inc - 1
         self.token = self.lexico.siguienteToken()
         
-        if self.token != ')': 
-            self.expresion_incremento()
+        if self.token != ')': self.expresion_incremento()
         
-        self.lexico.idx_token_actual = indice_actual - 1
+        self.lexico.idx_token_actual = idx_actual - 1
         self.token = self.lexico.siguienteToken()
         
-        # --- 6. Salto final ---
-        self.generaCodigo.jump(etiqueta_cond)
-        
-        self.generaCodigo.label(etiqueta_fin) 
+        self.generaCodigo.jump(l_cond)
+        self.generaCodigo.label(l_fin) 
         self.tabla_simbolos.salir_ambito()
         self.loop_exit_stack.pop()
     
-    def definicion_clase(self):
-        if self.traza: print("ANALISIS SINTACTICO: <DEF_CLASE>")
-        self.parea('class')
-        
-        nombre_clase = self.token
-        if not self.automata.es_valido(nombre_clase):
-            self.errores(8)
+    def declaracion_simple(self):
+        # Helper para for
+        tipo = self.token
+        if tipo in ['int', 'char']: self.parea(tipo)
+        nom = self.token
+        self.tabla_simbolos.declarar(nom, tipo, self.lexico.lineaActual())
+        self.variable() 
+        if self.token == '=':
+            self.parea('=')
+            self.validar_asignacion(tipo, self.expresion() if tipo=='int' else self.valor_char()) 
+            self.generaCodigo.store()
             
-        self.tabla_simbolos.declarar_clase(nombre_clase, self.lexico.lineaActual())
+    def asignacion_simple(self):
+        # Helper para for
+        if self.automata.es_valido(self.token):
+            tipo = self.variable() 
+            self.parea('=')
+            self.validar_asignacion(tipo, self.expresion()) 
+            self.generaCodigo.store()
+
+    def definicion_clase(self):
+        self._log("DEF_CLASE")
+        self.parea('class')
+        nombre = self.token
+        if not self.automata.es_valido(nombre): self.errores(8)
+        self.tabla_simbolos.declarar_clase(nombre, self.lexico.lineaActual())
+        self.tabla_simbolos.entrar_clase(nombre) 
         
-        # --- ENTRAR A LA CLASE ---
-        self.tabla_simbolos.entrar_clase(nombre_clase) 
-        
-        self.generaCodigo.label(f"CLASS_{nombre_clase}")
-        
+        self.generaCodigo.label(f"CLASS_{nombre}")
         self.token = self.lexico.siguienteToken()
         self.parea('{')
         
@@ -839,70 +664,66 @@ class Sintactico:
                 self.parea(':')
             
             if self.token in ['int', 'char', 'void', 'float', 'double']:
-                tipo_miembro = self.token
+                tipo = self.token
                 self.token = self.lexico.siguienteToken()
-                
-                nombre_miembro = self.token
+                nom = self.token
                 self.token = self.lexico.siguienteToken()
                 
                 if self.token == '(': 
-                    # ES UN MÉTODO
                     self.lexico.devuelveToken() 
                     self.lexico.devuelveToken() 
-                    self.token = tipo_miembro 
+                    self.token = tipo 
                     self.definicion_funcion()
                 else: 
-                    # ES UN ATRIBUTO
                     self.parea(';')
-                    self.tabla_simbolos.declarar_atributo(nombre_miembro, tipo_miembro, self.lexico.lineaActual())
+                    self.tabla_simbolos.declarar_atributo(nom, tipo, self.lexico.lineaActual())
 
         self.parea('}')
         self.parea(';')
-        
-        # --- SALIR DE LA CLASE ---
         self.tabla_simbolos.salir_clase()
         
     def declaracion_objeto(self):
-        if self.traza: print("ANALISIS SINTACTICO: <DECLARACION_OBJETO>")
-        nombre_clase = self.token
+        self._log("DECL_OBJETO")
+        clase = self.token
         self.token = self.lexico.siguienteToken()
-        
-        nombre_objeto = self.token
-        self.tabla_simbolos.declarar(nombre_objeto, nombre_clase, self.lexico.lineaActual())
+        obj = self.token
+        self.tabla_simbolos.declarar(obj, clase, self.lexico.lineaActual())
         self.token = self.lexico.siguienteToken()
-        
         self.parea(';')
     
-    def llamada_metodo_objeto(self, info_metodo, nombre_metodo):
-        tipos_params_esperados = info_metodo['params']
-        
+    def llamada_metodo_objeto(self, info, nombre):
+        params = info['params']
         self.parea('(')
-        
-        argumentos_encontrados = 0
+        found = 0
         if self.token != ')':
             while True:
-                if argumentos_encontrados >= len(tipos_params_esperados):
-                    self.error_semantico(f"Demasiados argumentos para '{nombre_metodo}'.")
+                if found >= len(params): self.error_semantico(f"Demasiados args en '{nombre}'.")
+                arg = self.expresion()
+                esp = params[found]
+                if arg != esp and not (arg=='int' and esp=='double'): 
+                     self.error_semantico(f"Arg {found+1} tipo incorrecto.")
                 
-                tipo_arg = self.expresion()
-                tipo_esperado = tipos_params_esperados[argumentos_encontrados]
-                
-                if tipo_arg != tipo_esperado:
-                    if not (tipo_arg == 'int' and tipo_esperado == 'double'): 
-                        self.error_semantico(f"Arg {argumentos_encontrados+1} espera {tipo_esperado}, recibió {tipo_arg}")
-                
-                self.generaCodigo.push_param(f"arg_{argumentos_encontrados}")
-                argumentos_encontrados += 1
-                
-                if self.token == ',':
-                    self.parea(',')
-                else:
-                    break
+                self.generaCodigo.push_param(f"arg_{found}")
+                found += 1
+                if self.token == ',': self.parea(',')
+                else: break
         
-        if argumentos_encontrados < len(tipos_params_esperados):
-             self.error_semantico(f"Faltan argumentos para '{nombre_metodo}'.")
-
+        if found < len(params): self.error_semantico(f"Faltan args en '{nombre}'.")
         self.parea(')')
-        self.generaCodigo.call_function(nombre_metodo) 
-        
-        return info_metodo['tipo']
+        self.generaCodigo.call_function(nombre) 
+        return info['tipo']
+
+    # --- VALIDACIONES SEMÁNTICAS ---
+    def validar_tipo_condicion(self, tipo):
+        if tipo not in ['int', 'char']: self.error_semantico("Condición no booleana.")
+    
+    def validar_asignacion(self, var, expr):
+        if var != expr: self.error_semantico(f"Asignación inválida: {var} = {expr}")
+    
+    def validar_op_binaria(self, t1, op, t2):
+        if t1 != 'int' or t2 != 'int': self.error_semantico(f"Op binaria '{op}' solo ints.")
+        return 'int' 
+
+    def validar_op_relacional(self, t1, op, t2):
+        if t1 != t2: self.error_semantico(f"Op relacional '{op}' tipos distintos.")
+        return 'int'
