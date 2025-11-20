@@ -68,13 +68,43 @@ class Lexico:
                 self.tokens.append(op)
                 self.numeros_de_linea.append(numero_linea_actual)
                 
-            elif caracter in "+-*/%": # Operadores de un caracter
+            # --- COMENTARIOS ---
+            elif caracter == '/':
+                # Caso 1: Comentario de una línea (//)
+                if i + 1 < len(self.fuente) and self.fuente[i+1] == '/':
+                    if buffer: self._guardar_buffer(buffer, numero_linea_actual, PALABRAS_CLAVE); buffer = ''
+                    i += 2 
+                    while i < len(self.fuente) and self.fuente[i] != '\n':
+                        i += 1
+                    continue 
+
+                # Caso 2: Comentario multilínea (/* ... */)
+                elif i + 1 < len(self.fuente) and self.fuente[i+1] == '*':
+                    if buffer: self._guardar_buffer(buffer, numero_linea_actual, PALABRAS_CLAVE); buffer = ''
+                    i += 2 
+                    while i < len(self.fuente):
+                        if self.fuente[i] == '\n':
+                            numero_linea_actual += 1 
+                        
+                        if self.fuente[i] == '*' and i + 1 < len(self.fuente) and self.fuente[i+1] == '/':
+                            i += 2 
+                            break
+                        i += 1
+                    continue 
+                
+                # Caso 3: Es una división normal (/)
+                else:
+                    if buffer: self._guardar_buffer(buffer, numero_linea_actual, PALABRAS_CLAVE); buffer = ''
+                    self.tokens.append(caracter)
+                    self.numeros_de_linea.append(numero_linea_actual)
+
+            # Modificamos la lista original para quitar '/' ya que la manejamos arriba
+            elif caracter in "+-*%": 
                 if buffer: self._guardar_buffer(buffer, numero_linea_actual, PALABRAS_CLAVE); buffer = ''
                 self.tokens.append(caracter)
                 self.numeros_de_linea.append(numero_linea_actual)
             elif caracter == "'":
                 if buffer: self._guardar_buffer(buffer, numero_linea_actual, PALABRAS_CLAVE); buffer = ''
-                
                 char_token = "'" 
                 i += 1
                 
@@ -86,6 +116,7 @@ class Lexico:
                     char_token += "'"
                     self.tokens.append(char_token)
                     self.numeros_de_linea.append(numero_linea_actual)
+                    
                 else:
                     self.tokens.append(f"INVALIDO({char_token})")
                     self.numeros_de_linea.append(numero_linea_actual)
