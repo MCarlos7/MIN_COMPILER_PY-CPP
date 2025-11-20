@@ -1,4 +1,3 @@
-# main.py
 # Carlos Alberto Mariscal Romo CUCEI
 # My Repository: https://github.com/MCarlos7/MIN_COMPILER_PY-CPP.git
 

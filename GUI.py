@@ -1,7 +1,8 @@
+from ANALISIS.Analisis_Lexico import Lexico, Automata
+from ANALISIS.Analisis_Sintactico import Sintactico
+from ANALISIS.Analisis_Semantico import AnalizadorSemantico 
+
 import tkinter as tk
-from Analisis_Lexico import Lexico, Automata 
-from Analisis_Sintactico import Sintactico
-from Analisis_Semantico import AnalizadorSemantico 
 from tkinter import scrolledtext, PanedWindow, filedialog, messagebox
 import sys
 import io

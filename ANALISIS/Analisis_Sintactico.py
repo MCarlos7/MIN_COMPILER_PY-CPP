@@ -1,8 +1,8 @@
 # Analisis_Sintactico.py
 
-from Analisis_Lexico import Lexico, Automata
-from GeneraCodigo import GeneraCodigo
-from Analisis_Semantico import TablaSimbolos, SemanticError 
+from ANALISIS.Analisis_Lexico import Lexico, Automata
+from ANALISIS.GeneraCodigo import GeneraCodigo
+from ANALISIS.Analisis_Semantico import TablaSimbolos, SemanticError 
 
 class Sintactico:
     """
